@@ -1,29 +1,36 @@
-module fetch ( icache_ready, icache_valid, icache_error, icache_data,
-               brpred_bptaken, brpred_bptag, brpred_addr,
-               decode_stall,
-               rob_flush, 
+// instruction fetch unit
+module fetch(
+  input         clk,
+  input         rst,
 
-               ic_req, ic_addr, ic_flush,
-               bp_req, bp_addr, 
-               de_valid, de_error, de_addr, de_insn, de_bptag, de_bptaken);
-   
-   input icache_ready, icache_valid, icache_error;
-   input[31:0] icache_data;
-   input brpred_bptaken;
-   input[13:0] brpred_bptag;
-   input[29:0] brpred_addr;
-   input decode_stall;
-   input rob_flush;
+  // icache interface
+  output        fetch_ic_req,
+  output [31:2] fetch_ic_addr,
+  output        fetch_ic_flush,
+  input         icache_ready,
+  input         icache_valid,
+  input         icache_error,
+  input [31:0]  icache_data,
 
-   output ic_req, ic_flush;
-   output[29:0] ic_addr;
-   output bp_req;
-   output[29:0] bp_addr;
-   output de_valid, de_error, de_bptag, de_bptaken;
-   output[29:0] de_addr;
-   output[31:0] de_insn;
-   output[13:0] de_bptag;
+  // brpred interface
+  output        fetch_bp_req,
+  output [31:2] fetch_bp_addr,
+  input         brpred_bptaken,
+  input [13:0]  brpred_bptag,
+  input [29:0]  brpred_addr,
 
-   
+  // decode interface
+  output        fetch_de_valid,
+  output        fetch_de_error,
+  output [29:0] fetch_de_addr,
+  output [31:0] fetch_de_insn,
+  output [13:0] fetch_de_bptag,
+  output        fetch_de_bptaken,
+  input         decode_stall,
+
+  // rob interface
+  input         rob_flush);
+
+
 
 endmodule

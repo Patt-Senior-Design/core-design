@@ -1,15 +1,19 @@
-module brpred( fetch_req, fetch_addr,
-               rob_flush, rob_ret_valid, rob_ret_brtag, rob_ret_brtaken,
-               bp_taken, bp_tag, bp_addr);
+// two-level adaptive branch predictor
+module brpred(
+  input         clk,
+  input         rst,
 
-   input fetch_req;
-   input[29:0] fetch_addr;
-   input rob_flush, rob_ret_valid, rob_brtaken;
-   input[13:0] rob_ret_brtaken;
+  // fetch interface
+  input         fetch_bp_req,
+  input [31:2]  fetch_bp_addr,
+  output        brpred_bptaken,
+  output [13:0] brpred_bptag,
+  output [31:2] brpred_addr,
 
-   output bp_taken;
-   output[13:0] bp_tag;
-   output[29:0] bp_addr;
-
+  // rob interface
+  input         rob_flush,
+  input         rob_ret_valid,
+  input         rob_ret_brtaken,
+  input [13:0]  rob_ret_brtag);
 
 endmodule

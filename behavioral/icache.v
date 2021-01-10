@@ -1,10 +1,17 @@
-module icache( req, addr, flush,
-               ready, valid, error, data);
+// instruction cache
+module icache(
+  input         clk,
+  input         rst,
 
-   input req, flush;
-   input[29:0] addr;
+  // fetch interface
+  input         fetch_ic_req,
+  input [31:2]  fetch_ic_addr,
+  input         fetch_ic_flush,
+  output        icache_ready,
+  output        icache_valid,
+  output        icache_error,
+  output [31:0] icache_data);
 
-   output ready, valid, error;
-   output[31:0] data;
+
 
 endmodule
