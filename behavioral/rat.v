@@ -1,4 +1,4 @@
-// register allocation table (and register file)
+// register alias table
 module rat(
   input         clk,
   input         rst,
@@ -9,10 +9,10 @@ module rat(
   input [7:0]   rename_robid,
   input [4:0]   rename_rs1,
   input [4:0]   rename_rs2,
-  output        rat_rs1_valid,
-  output [31:0] rat_rs1_tagval,
-  output        rat_rs2_valid,
-  output [31:0] rat_rs2_tagval,
+  output reg       rat_rs1_valid,
+  output reg[31:0] rat_rs1_tagval,
+  output reg       rat_rs2_valid,
+  output reg[31:0] rat_rs2_tagval,
 
   // wb interface
   input         wb_valid,
@@ -27,6 +27,108 @@ module rat(
   input [5:0]   rob_ret_rd,
   input [31:0]  rob_ret_result);
 
+  wire[31:0] comm_val_rs1;
+  wire[31:0] comm_val_rs2;
+  wire[6:0] tag_rs1;
+  wire[6:0] tag_rs2;
+  wire[31:0] spec_val_rs1;
+  wire[31:0] spec_val_rs2;
+  reg forward_rs1;
+  reg forward_rs2;
 
+  reg valid_rs1;
+  reg valid_rs2;
+  reg committed_rs1;
+  reg committed_rs2;
+  
+  reg ld_comm_val;
+  reg ld_tag;
+  reg ld_spec_val;
+  reg ld_valid;
+  reg ld_committed;
+ 
+  reg[31:0] rat_valid;
+  reg[31:0] rat_committed;
+  
+  sram_rat #(.DATAW(32)) rat_comm_val (
+    .clk(clk),
+    .rst(rst),
+    .rd_en1(1'b1),
+    .rd_addr1(rename_rs1),
+    .rd_data1(comm_val_rs1),
+    .rd_en2(1'b1),
+    .rd_addr2(rename_rs2),
+    .rd_data2(comm_val_rs2),
+    .wr_en(ld_comm_val),
+    .wr_addr(rob_ret_rd[4:0]),
+    .wr_data(rob_ret_result));
+  
+  sram_rat #(.DATAW(7)) rat_tag (
+    .clk(clk),
+    .rst(rst),
+    .rd_en1(1'b1),
+    .rd_addr1(rename_rs1),
+    .rd_data1(tag_rs1),
+    .rd_en2(1'b1),
+    .rd_addr2(rename_rs2),
+    .rd_data2(tag_rs2),
+    .wr_en(ld_tag),
+    .wr_addr(rename_rd[4:0]),
+    .wr_data(rename_robid[6:0]));
+  
+  sram_rat #(.DATAW(32)) rat_spec_val (
+    .clk(clk),
+    .rst(rst),
+    .rd_en1(1'b1),
+    .rd_addr1(rename_rs1),
+    .rd_data1(spec_val_rs1),
+    .rd_en2(1'b1),
+    .rd_addr2(rename_rs2),
+    .rd_data2(spec_val_rs2),
+    .wr_en(ld_spec_val),
+    .wr_addr(wb_rd[4:0]),
+    .wr_data(wb_result));
+ 
 
+  always @(posedge clk) begin
+    if (rst) begin
+      rat_valid = 32'hFFFFFFFF;
+      rat_committed = 32'hFFFFFFFF;
+    end 
+    else begin 
+      // Write control bits
+      if (wb_valid) 
+        rat_valid[wb_rd[4:0]] = 1;
+      if (rob_ret_valid)
+        rat_committed[rob_ret_rd[4:0]] = 1;
+      if (rename_valid) begin
+        rat_valid[rename_rd[4:0]] = 0;
+        rat_committed[rename_rd[4:0]] = 0;
+      end
+      
+      // Read control bits
+      valid_rs1 <= rat_valid[rename_rs1];
+      valid_rs2 <= rat_valid[rename_rs2];
+      committed_rs1 <= rat_committed[rename_rs1];
+      committed_rs2 <= rat_committed[rename_rs2];
+    end
+  end
+
+  always @(*) begin
+    ld_tag = rename_valid & rename_rd[5];
+    ld_spec_val = wb_valid & (~wb_error) & wb_rd[5];
+    ld_comm_val = rob_ret_valid & rob_ret_rd[5];
+    /*set_valid = wb_valid;
+    rst_valid = rename_valid;
+    set_committed = rob_ret_valid;
+    rst_committed = rename_valid;*/
+    // Forward value
+    forward_rs1 = (wb_result[4:0] == rename_rs1);
+    forward_rs2 = (wb_result[4:0] == rename_rs2);
+    rat_rs1_valid = forward_rs1 | valid_rs1;
+    rat_rs2_valid = forward_rs2 | valid_rs2;
+    rat_rs1_tagval = rat_rs1_valid ? (forward_rs1 ? wb_result : spec_val_rs1) : tag_rs1;
+    rat_rs2_tagval = rat_rs2_valid ? (forward_rs2 ? wb_result : spec_val_rs2) : tag_rs2;
+  end
+  
 endmodule
