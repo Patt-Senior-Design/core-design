@@ -46,9 +46,6 @@ module exers #(
   // rob interface
   input         rob_flush);
 
-<<<<<<< HEAD
-  assign exers_stall = 0;
-=======
   integer i;
   reg [RS_ENTRIES-1:0] rs_valid;
   reg [4:0]            rs_op[RS_ENTRIES-1:0];
@@ -59,7 +56,6 @@ module exers #(
   reg [31:0]           rs_op1[RS_ENTRIES-1:0];
   reg [RS_ENTRIES-1:0] rs_op2ready;
   reg [31:0]           rs_op2[RS_ENTRIES-1:0];
->>>>>>> Trimmed rat/rename, finished initial exers
 
   reg[$clog2(RS_ENTRIES)-1:0] issue_idx;
   reg issue_valid;
