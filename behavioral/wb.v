@@ -67,6 +67,6 @@ module wb(
   // rob interface
   input         rob_flush);
 
-
+  assign wb_valid = 0;
 
 endmodule

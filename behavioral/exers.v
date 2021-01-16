@@ -44,6 +44,6 @@ module exers(
   // rob interface
   input         rob_flush);
 
-
+  assign exers_stall = 0;
 
 endmodule

@@ -4,7 +4,7 @@ module csr(
   input         rst,
 
   // rename interface
-  input         rename_write,
+  input         rename_csr_write,
   input [4:0]   rename_op,
   input [7:0]   rename_robid,
   input [5:0]   rename_rd,

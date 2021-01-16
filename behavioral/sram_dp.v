@@ -1,6 +1,6 @@
-module sram_dp(
-  parameter ADDRW = 8;
-  parameter DATAW = 8;
+module sram_dp #(
+  parameter ADDRW = 8,
+  parameter DATAW = 8
   )(
   input                  clk,
 

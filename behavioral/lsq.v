@@ -45,12 +45,13 @@ module lsq(
 
   // rob interface
   output        lsq_rob_write,
-  output [7:0]  lsq_rob_robid,
+  output [6:0]  lsq_rob_robid,
   output [4:0]  lsq_rob_lsqid,
   input         rob_flush,
   input         rob_ret_store,
-  input [4:0]   rob_lsqid);
+  input [4:0]   rob_ret_lsqid);
 
-
+  assign lsq_stall = 0;
+  assign lsq_rob_write = 0;
 
 endmodule

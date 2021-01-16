@@ -1,0 +1,81 @@
+module cpu(
+  input clk,
+  input rst);
+
+  /*AUTOWIRE*/
+
+  brpred brpred(
+    /*AUTOINST*/);
+
+  csr csr(
+    /*AUTOINST*/);
+
+  dcache dcache(
+    /*AUTOINST*/);
+
+  decode decode(
+    /*AUTOINST*/);
+
+  exers exers(
+    /*AUTOINST*/);
+
+  fetch fetch(
+    /*AUTOINST*/);
+
+  icache icache(
+    /*AUTOINST*/);
+
+  lsq lsq(
+    /*AUTOINST*/);
+
+  /*
+   mcalu AUTO_TEMPLATE(
+   .exers_mcalu_issue(exers_mcalu@_issue),
+   .mcalu_stall(mcalu@_stall),
+   .mcalu_valid(mcalu@_valid),
+   .mcalu_error(mcalu@_error),
+   .mcalu_ecause(mcalu@_ecause[]),
+   .mcalu_robid(mcalu@_robid[]),
+   .mcalu_rd(mcalu@_rd[]),
+   .mcalu_result(mcalu@_result[]),
+   .wb_mcalu_stall(wb_mcalu@_stall));
+   */
+
+  mcalu mcalu0(
+    /*AUTOINST*/);
+
+  mcalu mcalu1(
+    /*AUTOINST*/);
+
+  rat rat(
+    /*AUTOINST*/);
+
+  rename rename(
+    /*AUTOINST*/);
+
+  rob rob(
+    /*AUTOINST*/);
+
+  /*
+   scalu AUTO_TEMPLATE(
+   .exers_scalu_issue(exers_scalu@_issue),
+   .scalu_stall(scalu@_stall),
+   .scalu_valid(scalu@_valid),
+   .scalu_error(scalu@_error),
+   .scalu_ecause(scalu@_ecause[]),
+   .scalu_robid(scalu@_robid[]),
+   .scalu_rd(scalu@_rd[]),
+   .scalu_result(scalu@_result[]),
+   .wb_scalu_stall(wb_scalu@_stall));
+   */
+
+  scalu scalu0(
+    /*AUTOINST*/);
+
+  scalu scalu1(
+    /*AUTOINST*/);
+
+  wb wb(
+    /*AUTOINST*/);
+
+endmodule

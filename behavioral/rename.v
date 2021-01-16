@@ -6,7 +6,7 @@ module rename(
   // decode interface
   input            decode_rename_valid,
   input [31:2]     decode_addr,
-  input [4:0]      decode_op,
+  input [4:0]      decode_rsop,
   input [7:0]      decode_robid,
   input [5:0]      decode_rd,
   input            decode_uses_rs1,
@@ -76,7 +76,7 @@ module rename(
       valid <= decode_rename_valid;
       robid <= decode_robid;
       addr <= {decode_addr, 2'b00};
-      op <= decode_op;
+      op <= decode_rsop;
       rd <= decode_rd;
       uses_rs1 <= decode_uses_rs1;
       uses_rs2 <= decode_uses_rs2;
