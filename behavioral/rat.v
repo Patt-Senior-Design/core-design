@@ -112,9 +112,9 @@ module rat(
   end
 
   always @(*) begin
-    ld_tag = rename_rat_valid & rename_rat_rd[5];
-    ld_spec_val = wb_valid & (~wb_error) & wb_rd[5];
-    ld_comm_val = rob_ret_valid & rob_ret_rd[5];
+    ld_tag = rename_rat_valid & (~rename_rat_rd[5]);
+    ld_spec_val = wb_valid & (~wb_error) & (~wb_rd[5]);
+    ld_comm_val = rob_ret_valid & (~rob_ret_rd[5]);
     // Forward value
     forward_rs1 = ld_spec_val & (wb_result[4:0] == rename_rat_rs1);
     forward_rs2 = ld_spec_val & (wb_result[4:0] == rename_rat_rs2);

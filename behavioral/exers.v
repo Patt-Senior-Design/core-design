@@ -65,7 +65,7 @@ module exers #(
   reg rs_full;
   reg is_sc_op;
 
-  wire resolve_valid = (wb_valid & (~wb_error) & wb_rd[5]);
+  wire resolve_valid = (wb_valid & (~wb_error) & (~wb_rd[5]));
 
   // Find empty entry to insert into or ready entry to issue (priority encoder)
   // MSB tells you whether index is found or not
@@ -123,7 +123,6 @@ module exers #(
     exers_scalu_op = rs_op[issue_idx];
 
     is_sc_op = (~& rs_op[issue_idx][4:3]);
-
     // NOTE: Can be modelled as issue array and stall array directly at inputs
     fu_issue_q = {is_sc_op & (~scalu0_stall), is_sc_op & (~scalu1_stall), ~mcalu0_stall, ~mcalu1_stall};
     casez(fu_issue_q)
