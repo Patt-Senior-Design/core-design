@@ -90,6 +90,7 @@ module rename(
     
   end
 
+
   always @(*) begin
     // reservation stations seq
     rename_lsq_write = valid & uses_memory;
@@ -99,7 +100,6 @@ module rename(
     rename_robid = robid;
     rename_rd = rd;
       
-    rename_op1ready = (~uses_rs1) | (uses_rs1 & rat_rs1_valid);
     // OP generation
     case ({uses_rs1, uses_pc})
       // LUI
@@ -120,14 +120,14 @@ module rename(
       2'b10: begin
         rename_op1ready = rat_rs1_valid;
         rename_op1 = rat_rs1_tagval;
-        casex ({uses_rs2, uses_imm})
+        casez ({uses_rs2, uses_imm})
           // OP/I and LD
           2'b01: begin
             rename_op2ready = 1;
             rename_op2 = imm;
           end
           // OP, ST
-          2'b1x: begin
+          2'b1?: begin
             rename_op2ready = rat_rs2_valid;
             rename_op2 = rat_rs2_tagval;
           end

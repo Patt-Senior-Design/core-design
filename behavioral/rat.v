@@ -24,7 +24,7 @@ module rat(
   // rob interface
   input         rob_flush,
   input         rob_ret_valid,
-  input [4:0]   rob_ret_rd,
+  input [5:0]   rob_ret_rd,
   input [31:0]  rob_ret_result);
 
   wire[31:0] comm_val_rs1;
@@ -41,6 +41,7 @@ module rat(
   reg committed_rs1;
   reg committed_rs2;
 
+  reg ld_comm_val;
   reg ld_tag;
   reg ld_spec_val;
   reg ld_valid;
@@ -58,8 +59,8 @@ module rat(
     .rd_en2(1'b1),
     .rd_addr2(rename_rat_rs2),
     .rd_data2(comm_val_rs2),
-    .wr_en(rob_ret_valid),
-    .wr_addr(rob_ret_rd),
+    .wr_en(ld_comm_val),
+    .wr_addr(rob_ret_rd[4:0]),
     .wr_data(rob_ret_result));
   
   sram_rat #(.DATAW(7)) rat_tag (
@@ -91,35 +92,29 @@ module rat(
 
   always @(posedge clk) begin
     if (rst) begin
-      rat_valid = 32'hFFFFFFFF;
-      rat_committed = 32'hFFFFFFFF;
+      rat_valid <= 32'hFFFFFFFF;
+      rat_committed <= 32'hFFFFFFFF;
     end 
-    else begin 
-      // Write control bits
-      if (wb_valid) 
-        rat_valid[wb_rd[4:0]] = 1;
-      if (rob_ret_valid)
-        rat_committed[rob_ret_rd] = 1;
-      if (rename_rat_valid) begin
-        rat_valid[rename_rat_rd[4:0]] = 0;
-        rat_committed[rename_rat_rd[4:0]] = 0;
-      end
-      
-      // Read control bits
-      valid_rs1 <= rat_valid[rename_rat_rs1];
-      valid_rs2 <= rat_valid[rename_rat_rs2];
-      committed_rs1 <= rat_committed[rename_rat_rs1];
-      committed_rs2 <= rat_committed[rename_rat_rs2];
-    end
+    // Write control bits
+    if (wb_valid) 
+      rat_valid[wb_rd[4:0]] <= 1;
+    if (rob_ret_valid)
+      rat_committed[rob_ret_rd[4:0]] <= 1;
+    if (rename_rat_valid) begin
+      rat_valid[rename_rat_rd[4:0]] <= 0;
+      rat_committed[rename_rat_rd[4:0]] <= 0;
+    end  
+    // Read control bits
+    valid_rs1 <= rat_valid[rename_rat_rs1];
+    valid_rs2 <= rat_valid[rename_rat_rs2];
+    committed_rs1 <= rat_committed[rename_rat_rs1];
+    committed_rs2 <= rat_committed[rename_rat_rs2];
   end
 
   always @(*) begin
     ld_tag = rename_rat_valid & rename_rat_rd[5];
     ld_spec_val = wb_valid & (~wb_error) & wb_rd[5];
-    /*set_valid = wb_valid;
-    rst_valid = rename_valid;
-    set_committed = rob_ret_valid;
-    rst_committed = rename_valid;*/
+    ld_comm_val = rob_ret_valid & rob_ret_rd[5];
     // Forward value
     forward_rs1 = ld_spec_val & (wb_result[4:0] == rename_rat_rs1);
     forward_rs2 = ld_spec_val & (wb_result[4:0] == rename_rat_rs2);
