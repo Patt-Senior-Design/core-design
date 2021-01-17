@@ -27,6 +27,6 @@ module csr(
   input [31:0]  rob_csr_tval,
   output [31:2] csr_tvec);
 
-
+  assign csr_valid = 0;
 
 endmodule

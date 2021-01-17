@@ -24,6 +24,6 @@ module mcalu(
   // rob interface
   input         rob_flush);
 
-
+  assign mcalu_valid = 0;
 
 endmodule

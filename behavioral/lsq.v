@@ -53,5 +53,6 @@ module lsq(
 
   assign lsq_stall = 0;
   assign lsq_rob_write = 0;
+  assign lsq_wb_valid = 0;
 
 endmodule
