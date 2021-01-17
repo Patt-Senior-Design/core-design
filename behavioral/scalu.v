@@ -35,13 +35,15 @@ module scalu(
     if (rst) begin
       valid <= 1'b0;
     end
-    if (exers_scalu_issue & (~scalu_stall)) begin
-      valid <= 1'b1;
-      op <= exers_scalu_op;
-      robid <= exers_robid;
-      rd <= exers_rd;
-      op1 <= exers_op1;
-      op2 <= exers_op2;
+    else if (~scalu_stall) begin
+      valid <= exers_scalu_issue;
+      if (exers_scalu_issue) begin
+        op <= exers_scalu_op;
+        robid <= exers_robid;
+        rd <= exers_rd;
+        op1 <= exers_op1;
+        op2 <= exers_op2;
+      end
     end
   end
 
