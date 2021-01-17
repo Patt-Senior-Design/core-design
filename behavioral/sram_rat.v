@@ -52,10 +52,10 @@ module sram_rat #(
 
   always @(negedge clk) begin
     if (rd_en1_r)
-      rd_data1 <= memory[rd_addr1_r];
+      rd_data1 <= rd_addr1_r ? memory[rd_addr1_r] : 0;
     if (rd_en2_r)
-      rd_data2 <= memory[rd_addr2_r];
-    if (wr_en_r)
+      rd_data2 <= rd_addr2_r ? memory[rd_addr2_r] : 0;
+    if (wr_en_r && wr_addr_r)
       memory[wr_addr_r] <= wr_data_r;
   end
 endmodule

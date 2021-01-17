@@ -113,8 +113,13 @@ module decode(
   wire [2:0] brop;
   assign brop = {~|funct3[2:1],funct3[2:1]};
 
+  wire [4:0] rs1, rs2, rd;
+  assign rs1 = insn[19:15];
+  assign rs2 = insn[24:20];
+  assign rd = insn[11:7];
+
   wire uses_rd, uses_rs1, uses_rs2;
-  assign uses_rd = fmt_r | fmt_i | fmt_u | fmt_j;
+  assign uses_rd = (fmt_r | fmt_i | fmt_u | fmt_j) & (rd != 0);
   assign uses_rs1 = fmt_r | (fmt_i & (~insn_csr | ~funct3[2])) | fmt_s | fmt_b;
   assign uses_rs2 = fmt_r | fmt_s | fmt_b;
 
@@ -148,8 +153,8 @@ module decode(
   assign decode_store = fmt_s;
   assign decode_uses_pc = fmt_j | insn_jalr | insn_auipc;
   assign decode_csr_access = insn_csr;
-  assign decode_rs1 = insn[19:15];
-  assign decode_rs2 = insn[24:20];
+  assign decode_rs1 = rs1;
+  assign decode_rs2 = rs2;
   assign decode_imm = imm;
 
   always @(posedge clk)

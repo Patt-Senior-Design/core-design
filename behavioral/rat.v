@@ -53,10 +53,10 @@ module rat(
   sram_rat #(.DATAW(32)) rat_comm_val (
     .clk(clk),
     .rst(rst),
-    .rd_en1(1'b1),
+    .rd_en1(rename_rat_valid),
     .rd_addr1(rename_rat_rs1),
     .rd_data1(comm_val_rs1),
-    .rd_en2(1'b1),
+    .rd_en2(rename_rat_valid),
     .rd_addr2(rename_rat_rs2),
     .rd_data2(comm_val_rs2),
     .wr_en(ld_comm_val),
@@ -66,10 +66,10 @@ module rat(
   sram_rat #(.DATAW(7)) rat_tag (
     .clk(clk),
     .rst(rst),
-    .rd_en1(1'b1),
+    .rd_en1(rename_rat_valid),
     .rd_addr1(rename_rat_rs1),
     .rd_data1(tag_rs1),
-    .rd_en2(1'b1),
+    .rd_en2(rename_rat_valid),
     .rd_addr2(rename_rat_rs2),
     .rd_data2(tag_rs2),
     .wr_en(ld_tag),
@@ -79,10 +79,10 @@ module rat(
   sram_rat #(.DATAW(32)) rat_spec_val (
     .clk(clk),
     .rst(rst),
-    .rd_en1(1'b1),
+    .rd_en1(rename_rat_valid),
     .rd_addr1(rename_rat_rs1),
     .rd_data1(spec_val_rs1),
-    .rd_en2(1'b1),
+    .rd_en2(rename_rat_valid),
     .rd_addr2(rename_rat_rs2),
     .rd_data2(spec_val_rs2),
     .wr_en(ld_spec_val),
@@ -100,7 +100,7 @@ module rat(
       rat_valid[wb_rd[4:0]] <= 1;
     if (rob_ret_valid)
       rat_committed[rob_ret_rd[4:0]] <= 1;
-    if (rename_rat_valid) begin
+    if (rename_rat_valid & (~rename_rat_rd[5])) begin
       rat_valid[rename_rat_rd[4:0]] <= 0;
       rat_committed[rename_rat_rd[4:0]] <= 0;
     end  
