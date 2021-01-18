@@ -1,4 +1,7 @@
-((verilog-mode . ((indent-tabs-mode . nil)
+((asm-mode . ((indent-tabs-mode . t)
+              (tab-width . 8)
+              (asm-comment-char . ?#)))
+ (verilog-mode . ((indent-tabs-mode . nil)
                   (tab-width . 8)
                   (verilog-auto-newline . nil)
                   (verilog-auto-lineup . 'declarations)
