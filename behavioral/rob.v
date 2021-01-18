@@ -137,7 +137,7 @@ module rob(
 
   // buf_head
   always @(posedge clk)
-    if(rst) begin
+    if(rst | rob_flush) begin
       buf_head <= 0;
       buf_head_pol <= 0;
     end else if(ret_valid)
@@ -145,7 +145,7 @@ module rob(
 
   // buf_tail
   always @(posedge clk)
-    if(rst) begin
+    if(rst | rob_flush) begin
       buf_tail <= 0;
       buf_tail_pol <= 0;
     end else if(decode_beat)
@@ -153,7 +153,7 @@ module rob(
 
   // buf read
   always @(posedge clk)
-    if(rst)
+    if(rst | rob_flush)
       ret_valid <= 0;
     else begin
       ret_valid <= buf_executed[ret_rd_addr] & ~buf_empty;

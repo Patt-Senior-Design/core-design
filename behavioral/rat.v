@@ -123,7 +123,7 @@ module rat(
   end
 
   always @(posedge clk) begin
-    if (rst) begin
+    if (rst | rob_flush) begin
       rat_valid <= 32'hFFFFFFFF;
       rat_committed <= 32'hFFFFFFFF;
     end 
@@ -145,9 +145,9 @@ module rat(
     end  
   end
 
+  // Save CDB values
   always @(posedge clk) begin
-    // Save CDB values
-    if (rst)
+    if (rst | rob_flush)
       wb_prev_write <= 1'b0;
     wb_prev_write <= wb_write;
     wb_prev_robid <= wb_robid[6:0];

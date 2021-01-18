@@ -81,7 +81,7 @@ module exers #(
   endfunction
 
   always @(posedge clk) begin
-    if (rst) begin
+    if (rst | rob_flush) begin
       rs_valid <= 32'h0;
     end 
     // Issue latch

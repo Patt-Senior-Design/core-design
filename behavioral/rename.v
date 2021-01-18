@@ -67,7 +67,7 @@ module rename(
 
   
   always @(posedge clk) begin
-    if (rst) begin
+    if (rst | rob_flush) begin
       // invalidate stage
       valid <= 0;
     end

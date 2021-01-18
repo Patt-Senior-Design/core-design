@@ -32,7 +32,7 @@ module scalu(
   reg[31:0] op2;
 
   always @(posedge clk) begin
-    if (rst) begin
+    if (rst | rob_flush) begin
       valid <= 1'b0;
     end
     else if (~scalu_stall) begin

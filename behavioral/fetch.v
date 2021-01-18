@@ -182,14 +182,14 @@ module fetch(
 
   // bp_req_r
   always @(posedge clk)
-    if(rst)
+    if(rst | rob_flush)
       bp_req_r <= 0;
     else
       bp_req_r <= fetch_bp_req;
 
   // insn_jal_r
   always @(posedge clk)
-    if(rst)
+    if(rst | rob_flush)
       insn_jal_r <= 0;
     else
       insn_jal_r <= insn_jal;

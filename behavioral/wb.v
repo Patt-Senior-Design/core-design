@@ -107,8 +107,8 @@ module wb(
   reg [4:0] fu_arbitrated;
 
   always @(posedge clk) begin
-    if (rst) begin
-      scalu0_valid_r <= 1'b0; 
+    if (rst | rob_flush) begin
+      scalu0_valid_r <= 1'b0;
       scalu1_valid_r <= 1'b0;
       mcalu0_valid_r <= 1'b0;
       mcalu1_valid_r <= 1'b0;
