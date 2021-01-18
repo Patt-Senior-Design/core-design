@@ -22,11 +22,13 @@ module brpred(
   reg [13:0]  pht_rd_addr_r;
   reg [1:0]   pht_rd_data, pht_wr_data;
 
-  wire [13:0] spec_bhr_next;
+  wire [13:0] arch_bhr_next, spec_bhr_next;
   wire [13:0] pht_rd_addr;
 
-  // we must forward the bhr during consecutive branch predictions
+  assign arch_bhr_next = {arch_bhr,rob_ret_bptaken};
   assign spec_bhr_next = {spec_bhr,brpred_bptaken};
+
+  // we must forward the bhr during consecutive branch predictions
   assign pht_rd_addr = (req_r ? spec_bhr_next : spec_bhr) ^ fetch_bp_addr[16:3];
 
   assign brpred_bptag = {pht_rd_data,pht_rd_addr_r};
@@ -71,14 +73,14 @@ module brpred(
     if(rst)
       arch_bhr <= 0;
     else if(rob_ret_branch)
-      arch_bhr <= {arch_bhr,rob_ret_bptaken};
+      arch_bhr <= arch_bhr_next;
 
   // spec_bhr
   always @(posedge clk)
     if(rst)
       spec_bhr <= 0;
     else if(rob_flush)
-      spec_bhr <= arch_bhr;
+      spec_bhr <= rob_ret_branch ? arch_bhr_next : arch_bhr;
     else if(req_r)
       spec_bhr <= spec_bhr_next;
 

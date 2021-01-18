@@ -53,7 +53,7 @@ module decode(
 
   reg        fmt_r, fmt_i, fmt_s, fmt_b, fmt_u, fmt_j, fmt_inv;
   reg [31:0] imm;
-  reg        rsop;
+  reg [4:0]  rsop;
 
   localparam
     ERR_IALIGN   = 0,
@@ -95,9 +95,6 @@ module decode(
     OPC_80B       = 5'b11111;
 
   // derived signals
-  wire fetch_beat;
-  assign fetch_beat = fetch_de_valid & ~decode_stall;
-
   wire [2:0] funct3;
   assign funct3 = insn[14:12];
 
@@ -123,6 +120,7 @@ module decode(
   assign uses_rs1 = fmt_r | (fmt_i & (~insn_csr | ~funct3[2])) | fmt_s | fmt_b;
   assign uses_rs2 = fmt_r | fmt_s | fmt_b;
 
+  // TODO misaligned target?
   wire [31:1] target;
   assign target = {addr[31:2],1'b0} + imm[31:1];
 
@@ -137,10 +135,10 @@ module decode(
   assign decode_rob_valid = valid;
   assign decode_error = error | fmt_inv;
   assign decode_ecause = error ? (addr[1] ? ERR_IALIGN : ERR_IFAULT) : ERR_IILLEGAL;
-  assign decode_retop = {insn_jalr,fmt_b,fmt_s,insn_csr,funct3};
+  assign decode_retop = {fmt_b,funct3[0],insn_jalr,fmt_s,funct3};
   assign decode_bptag = bptag;
   assign decode_bptaken = bptaken;
-  assign decode_target = target;
+  assign decode_target = target[31:2];
 
   // rename interface
   assign decode_rename_valid = valid & ~decode_error;
@@ -160,13 +158,15 @@ module decode(
   always @(posedge clk)
     if(rst | rob_flush)
       valid <= 0;
-    else if(fetch_beat) begin
+    else if(~decode_stall) begin
       valid <= fetch_de_valid;
-      error <= fetch_de_error;
-      addr <= fetch_de_addr;
-      insn <= fetch_de_insn;
-      bptag <= fetch_de_bptag;
-      bptaken <= fetch_de_bptaken;
+      if(fetch_de_valid) begin
+        error <= fetch_de_error;
+        addr <= fetch_de_addr;
+        insn <= fetch_de_insn;
+        bptag <= fetch_de_bptag;
+        bptaken <= fetch_de_bptaken;
+      end
     end
 
   // format decoder
@@ -249,7 +249,7 @@ module decode(
       insn_jalr:
         rsop = 5'b10000;
       fmt_b:
-        rsop = {2'b00,brop};
+        rsop = {2'b01,brop};
       default:
         rsop = {1'b0,insn[30],funct3};
     endcase

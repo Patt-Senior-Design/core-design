@@ -70,6 +70,9 @@ module fetch(
   assign buf_empty = (buf_head == buf_tail) & (buf_head_pol == buf_tail_pol);
   assign buf_full  = (buf_head == buf_tail) & (buf_head_pol != buf_tail_pol);
 
+  wire [3:0] buf_mid_prev;
+  assign buf_mid_prev = buf_mid - 1;
+
   wire icache_beat;
   assign icache_beat = fetch_ic_req & icache_ready;
 
@@ -117,9 +120,9 @@ module fetch(
     else if(rob_flush)
       pc <= {rob_flush_pc,1'b0};
     else if(br_taken)
-      pc <= br_target(buf_addr[buf_mid-1][31:2], buf_insn[buf_mid-1]);
+      pc <= br_target(buf_addr[buf_mid_prev][31:2], buf_insn[buf_mid_prev]);
     else if(insn_jal_r)
-      pc <= jal_target(buf_addr[buf_mid-1][31:2], buf_insn[buf_mid-1]);
+      pc <= jal_target(buf_addr[buf_mid_prev][31:2], buf_insn[buf_mid_prev]);
     else if(icache_beat)
       pc <= pc + 2;
 
@@ -128,7 +131,7 @@ module fetch(
     if(rst | rob_flush) begin
       buf_tail <= 0;
       buf_tail_pol <= 0;
-    end else if(fetch_ic_flush) begin
+    end else if(setpc) begin
       buf_tail <= buf_mid;
       buf_tail_pol <= buf_mid_pol;
     end else if(icache_beat)
@@ -139,7 +142,7 @@ module fetch(
     if(rst | rob_flush) begin
       buf_mid <= 0;
       buf_mid_pol <= 0;
-    end else if(icache_valid)
+    end else if(icache_valid & ~setpc)
       {buf_mid_pol,buf_mid} <= {buf_mid_pol,buf_mid} + 1;
 
   // buf_head
@@ -174,9 +177,9 @@ module fetch(
       end
 
       if(bp_req_r) begin
-        buf_valid[buf_mid-1] <= 1;
-        buf_bptag[buf_mid-1] <= brpred_bptag;
-        buf_bptaken[buf_mid-1] <= brpred_bptaken;
+        buf_valid[buf_mid_prev] <= 1;
+        buf_bptag[buf_mid_prev] <= brpred_bptag;
+        buf_bptaken[buf_mid_prev] <= brpred_bptaken;
       end
     end
 

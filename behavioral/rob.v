@@ -116,12 +116,12 @@ module rob(
   assign rob_flush_pc = ret_error ? csr_tvec : ret_target;
 
   // rat interface
-  assign rob_ret_valid = ret_valid & ~ret_error & ret_rd[5];
+  assign rob_ret_valid = ret_valid & ~ret_error & ~ret_rd[5];
   assign rob_ret_rd = ret_rd[4:0];
   assign rob_ret_result = ret_result;
 
   // brpred interface
-  assign rob_ret_branch = ret_valid & ret_retop[4];
+  assign rob_ret_branch = ret_valid & ret_retop[6];
   assign rob_ret_bptag = ret_bptag;
   assign rob_ret_bptaken = br_result;
 
