@@ -104,15 +104,15 @@ module rat(
   always @(posedge clk) begin
     // SRAM Behavioral
     if (rename_rat_valid) begin
-      comm_val_rs1 <= rat_comm_val[rename_rat_rs1];
-      comm_val_rs2 <= rat_comm_val[rename_rat_rs2];
+      comm_val_rs1 <= rename_rat_rs1 ? rat_comm_val[rename_rat_rs1] : 0;
+      comm_val_rs2 <= rename_rat_rs2 ? rat_comm_val[rename_rat_rs2] : 0;
       tag_rs1 <= rat_tag[rename_rat_rs1];
       tag_rs2 <= rat_tag[rename_rat_rs2];
       tag_wb <= rat_tag[wb_rd[4:0]];
-      spec_val_rs1 <= (wb_prev_write & (rename_rat_rs1 == wb_prev_rd)) ? 
-                        wb_prev_result : rat_spec_val[rename_rat_rs1];
-      spec_val_rs2 <= (wb_prev_write & (rename_rat_rs2 == wb_prev_rd)) ?
-                        wb_prev_result : rat_spec_val[rename_rat_rs2];
+      spec_val_rs1 <= (ld_spec_val & (rename_rat_rs1 == wb_prev_rd)) ?
+                        wb_prev_result : (rename_rat_rs1 ? rat_spec_val[rename_rat_rs1] : 0);
+      spec_val_rs2 <= (ld_spec_val & (rename_rat_rs2 == wb_prev_rd)) ?
+                        wb_prev_result : (rename_rat_rs2 ? rat_spec_val[rename_rat_rs2] : 0);
     end
     if (rob_ret_valid)
       rat_comm_val[rob_ret_rd] <= rob_ret_result;
@@ -131,7 +131,7 @@ module rat(
       // Read control bits: Forward if insn in decode and 2nd wb cycle
       valid_rs1 <= (wb_prev_write & (rename_rat_rs1 == wb_prev_rd)) ?
                     1'b1 : rat_valid[rename_rat_rs1];
-      valid_rs2 <= (wb_prev_write & (rename_rat_rs1 == wb_prev_rd)) ? 
+      valid_rs2 <= (wb_prev_write & (rename_rat_rs2 == wb_prev_rd)) ?
                     1'b1 : rat_valid[rename_rat_rs2];
       committed_rs1 <= rat_committed[rename_rat_rs1];
       committed_rs2 <= rat_committed[rename_rat_rs2];
@@ -170,14 +170,14 @@ module rat(
       2'b00: rat_rs1_tagval = (forward_prev_rs1 ? wb_prev_result : 
                                 (forward_cur_rs1 ? wb_result : tag_rs1));
       2'b01: rat_rs1_tagval = spec_val_rs1;
-      2'b10: rat_rs1_tagval = comm_val_rs1;
+      2'b11: rat_rs1_tagval = comm_val_rs1;
       default: rat_rs1_tagval = 32'bx;
     endcase
     casez({committed_rs2, valid_rs2})
       2'b00: rat_rs2_tagval = (forward_prev_rs2 ? wb_prev_result :
                                 (forward_cur_rs2 ? wb_result : tag_rs2));
       2'b01: rat_rs2_tagval = spec_val_rs2;
-      2'b10: rat_rs2_tagval = comm_val_rs2;
+      2'b11: rat_rs2_tagval = comm_val_rs2;
       default: rat_rs1_tagval = 32'bx;
     endcase
   end
