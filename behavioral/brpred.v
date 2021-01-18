@@ -15,14 +15,15 @@ module brpred(
   input [15:0]  rob_ret_bptag,
   input         rob_ret_bptaken);
 
+  reg [1:0]   pht [0:16383];
+
   reg         req_r;
   reg [13:0]  arch_bhr, spec_bhr;
   reg [13:0]  pht_rd_addr_r;
-  reg [1:0]   pht_wr_data;
+  reg [1:0]   pht_rd_data, pht_wr_data;
 
   wire [13:0] spec_bhr_next;
   wire [13:0] pht_rd_addr;
-  wire [1:0]  pht_rd_data;
 
   // we must forward the bhr during consecutive branch predictions
   assign spec_bhr_next = {spec_bhr,brpred_bptaken};
@@ -44,14 +45,19 @@ module brpred(
       3'b1_11: pht_wr_data = 2'b11;
     endcase
 
-  sram_dp #(14,2) pht(
-    .clk(clk),
-    .rd_en(fetch_bp_req),
-    .rd_addr(pht_rd_addr),
-    .rd_data(pht_rd_data),
-    .wr_en(rob_ret_branch),
-    .wr_addr(rob_ret_bptag[13:0]),
-    .wr_data(pht_wr_data));
+  // for simulation only
+  integer i;
+  initial
+    for(i = 0; i < 16384; i=i+1)
+      pht[i] = 0;
+
+  // pht
+  always @(posedge clk) begin
+    if(fetch_bp_req)
+      pht_rd_data <= pht[pht_rd_addr];
+    if(rob_ret_branch)
+      pht[rob_ret_bptag[13:0]] <= pht_wr_data;
+  end
 
   // req_r
   always @(posedge clk)
