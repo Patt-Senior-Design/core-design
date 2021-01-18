@@ -59,10 +59,10 @@ module scalu(
   always @(*) begin
     casez(op[2:0])
       3'b000: scalu_result = (op[3] ? op1 + (~op2+1) : op1 + op2); // ADD,SUB
-      3'b001: scalu_result = (op1 >> op2); // SLL
+      3'b001: scalu_result = (op1 << op2); // SLL
       3'b010: scalu_result = ($signed(op1) < $signed(op2)); // SLT
       3'b011: scalu_result = (op1 < op2); // SLTU
-      3'b100: scalu_result = (op1 ^ op2); // XOR
+      3'b100: scalu_result = (op[3] ? (op1 == op2) : (op1 ^ op2)); // XOR, SEQ
       3'b101: scalu_result = (op[3] ? (op1 >> op2) : ($signed(op1) >>> op2)); // SRL, SRA
       3'b110: scalu_result = (op1 | op2);
       3'b111: scalu_result = (op1 & op2);
