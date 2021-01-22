@@ -36,7 +36,6 @@ module decode(
   output        decode_uses_rs2,
   output        decode_uses_imm,
   output        decode_uses_memory,
-  output        decode_store,
   output        decode_uses_pc,
   output        decode_csr_access,
   output [4:0]  decode_rs1,
@@ -148,7 +147,6 @@ module decode(
   assign decode_uses_rs2 = uses_rs2;
   assign decode_uses_imm = ~fmt_r & ~fmt_b;
   assign decode_uses_memory = insn_load | fmt_s;
-  assign decode_store = fmt_s;
   assign decode_uses_pc = fmt_j | insn_jalr | insn_auipc;
   assign decode_csr_access = insn_csr;
   assign decode_rs1 = rs1;

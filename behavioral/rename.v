@@ -14,7 +14,6 @@ module rename(
   input            decode_uses_imm,
   input            decode_uses_memory,
   input            decode_uses_pc,
-  input            decode_store,
   input            decode_csr_access,
   input [4:0]      decode_rs1,
   input [4:0]      decode_rs2,
@@ -61,7 +60,6 @@ module rename(
   reg uses_imm;
   reg uses_memory;
   reg uses_pc;
-  reg store;
   reg csr_access;
   reg [31:0] imm;
 
@@ -78,7 +76,6 @@ module rename(
       uses_imm <= decode_uses_imm;
       uses_memory <= decode_uses_memory;
       uses_pc <= decode_uses_pc;
-      store <= decode_store;
       csr_access <= decode_csr_access;
       imm <= decode_imm;
     end
