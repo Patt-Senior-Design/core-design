@@ -172,7 +172,7 @@ module rob(
   // buf write
   always @(posedge clk) begin
     if(decode_beat) begin
-      buf_executed[buf_tail] <= 0;
+      buf_executed[buf_tail] <= decode_retop[3];
       buf_error[buf_tail] <= decode_error;
       buf_retop[buf_tail] <= decode_retop;
       buf_addr[buf_tail] <= decode_addr;
