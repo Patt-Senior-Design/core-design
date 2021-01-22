@@ -123,10 +123,6 @@ module rat(
   end
 
   always @(posedge clk) begin
-    if (rst | rob_flush) begin
-      rat_valid <= 32'hFFFFFFFF;
-      rat_committed <= 32'hFFFFFFFF;
-    end 
     if (rename_rat_valid) begin
       // Read control bits: Forward if insn in decode and 2nd wb cycle
       valid_rs1 <= (wb_prev_write & (rename_rat_rs1 == wb_prev_rd)) ?
@@ -142,17 +138,23 @@ module rat(
     if (rename_rat_valid & (~rename_rat_rd[5])) begin
       rat_valid[rename_rat_rd[4:0]] <= 0;
       rat_committed[rename_rat_rd[4:0]] <= 0;
-    end  
+    end
+    // Reset/flush logic (highest priority)
+    if (rst | rob_flush) begin
+      rat_valid <= 32'hFFFFFFFF;
+      rat_committed <= 32'hFFFFFFFF;
+    end
   end
 
   // Save CDB values
   always @(posedge clk) begin
-    if (rst | rob_flush)
-      wb_prev_write <= 1'b0;
     wb_prev_write <= wb_write;
     wb_prev_robid <= wb_robid[6:0];
     wb_prev_result <= wb_result;
     wb_prev_rd <= wb_rd[4:0];
+    // Reset/flush logic (highest priority)
+    if (rst | rob_flush)
+      wb_prev_write <= 1'b0;
   end
 
   always @(*) begin

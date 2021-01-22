@@ -67,11 +67,6 @@ module rename(
 
   
   always @(posedge clk) begin
-    if (rst | rob_flush) begin
-      // invalidate stage
-      valid <= 0;
-    end
-
     if (!rename_stall) begin
       valid <= decode_rename_valid;
       robid <= decode_robid;
@@ -88,6 +83,10 @@ module rename(
       imm <= decode_imm;
     end
     
+    if (rst | rob_flush) begin
+      // invalidate stage
+      valid <= 0;
+    end
   end
 
 

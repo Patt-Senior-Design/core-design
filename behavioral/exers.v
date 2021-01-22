@@ -81,9 +81,6 @@ module exers #(
   endfunction
 
   always @(posedge clk) begin
-    if (rst | rob_flush) begin
-      rs_valid <= 32'h0;
-    end 
     // Issue latch
     if (issue_valid & (~issue_stall)) begin
       rs_valid[issue_idx] <= 1'b0;
@@ -109,6 +106,10 @@ module exers #(
         rs_op2ready[i] <= 1'b1;
         rs_op2[i] <= wb_result;
       end
+    end
+    // Reset/flush logic (highest priority)
+    if (rst | rob_flush) begin
+      rs_valid <= 32'h0;
     end
   end
 
