@@ -7,13 +7,13 @@ module dcache(
   input         lsq_dc_req,
   input [3:0]   lsq_dc_op,
   input [31:0]  lsq_dc_addr,
-  input [4:0]   lsq_dc_lsqid,
+  input [3:0]   lsq_dc_lsqid,
   input [31:0]  lsq_dc_wdata,
   input         lsq_dc_flush,
   output        dcache_ready,
   output        dcache_valid,
   output        dcache_error,
-  output [4:0]  dcache_lsqid,
+  output [3:0]  dcache_lsqid,
   output [31:0] dcache_rdata);
 
   reg [31:0] storage [0:1048575]; // 4MB
@@ -26,7 +26,7 @@ module dcache(
   reg        req_s0, req_s1;
   reg [3:0]  op_s0, op_s1;
   reg [31:0] addr_s0, addr_s1;
-  reg [4:0]  lsqid_s0, lsqid_s1;
+  reg [3:0]  lsqid_s0, lsqid_s1;
   reg [31:0] wdata_s0, rdata_s1;
   always @(posedge clk)
     if(rst | lsq_dc_flush) begin

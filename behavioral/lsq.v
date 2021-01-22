@@ -19,13 +19,13 @@ module lsq(
   output        lsq_dc_req,
   output [3:0]  lsq_dc_op,
   output [31:0] lsq_dc_addr,
-  output [4:0]  lsq_dc_lsqid,
+  output [3:0]  lsq_dc_lsqid,
   output [31:0] lsq_dc_wdata,
   output        lsq_dc_flush,
   input         dcache_ready,
   input         dcache_valid,
   input         dcache_error,
-  input [4:0]   dcache_lsqid,
+  input [3:0]   dcache_lsqid,
   input [31:0]  dcache_rdata,
 
   // writeback interface (out)
