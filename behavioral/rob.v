@@ -16,11 +16,6 @@ module rob(
   output        rob_full,
   output [7:0]  rob_robid,
 
-  // lsq interface (in)
-  input         lsq_rob_write,
-  input [6:0]   lsq_rob_robid,
-  input [4:0]   lsq_rob_lsqid,
-
   // wb interface
   input         wb_valid,
   input         wb_error,
@@ -46,7 +41,6 @@ module rob(
 
   // lsq interface (out)
   output        rob_ret_store,
-  output [4:0]  rob_ret_lsqid,
 
   // csr interface
   input [31:2]  csr_tvec,
@@ -65,7 +59,6 @@ module rob(
   reg [31:2]  buf_target [0:127];
   reg [15:0]  buf_bptag [0:127];
   reg [127:0] buf_bptaken;
-  reg [4:0]   buf_lsqid [0:127];
 
   // insert at tail, remove at head
   reg [6:0]   buf_head, buf_tail;
@@ -81,7 +74,6 @@ module rob(
   reg [31:2]  ret_target;
   reg [15:0]  ret_bptag;
   reg         ret_bptaken;
-  reg [4:0]   ret_lsqid;
 
   wire [7:0] buf_head_next;
   wire [6:0] ret_rd_addr;
@@ -127,7 +119,6 @@ module rob(
 
   // lsq interface (out)
   assign rob_ret_store = ret_valid & ~ret_error & ret_retop[3];
-  assign rob_ret_lsqid = ret_lsqid;
 
   // csr interface
   assign rob_csr_valid = ret_exc;
@@ -166,7 +157,6 @@ module rob(
       ret_target <= buf_target[ret_rd_addr];
       ret_bptag <= buf_bptag[ret_rd_addr];
       ret_bptaken <= buf_bptaken[ret_rd_addr];
-      ret_lsqid <= buf_lsqid[ret_rd_addr];
     end
 
   // buf write
@@ -182,9 +172,6 @@ module rob(
       buf_bptag[buf_tail] <= decode_bptag;
       buf_bptaken[buf_tail] <= decode_bptaken;
     end
-
-    if(lsq_rob_write)
-      buf_lsqid[lsq_rob_robid] <= lsq_rob_lsqid;
 
     if(wb_valid) begin
       buf_executed[wb_robid] <= 1;

@@ -45,12 +45,8 @@ module lsq(
   input [31:0]  wb_result,
 
   // rob interface
-  output        lsq_rob_write,
-  output [6:0]  lsq_rob_robid,
-  output [4:0]  lsq_rob_lsqid,
   input         rob_flush,
-  input         rob_ret_store,
-  input [4:0]   rob_ret_lsqid);
+  input         rob_ret_store);
 
   // load queue
   reg [15:0]  lq_valid;
@@ -179,11 +175,6 @@ module lsq(
   assign lsq_wb_robid = lq_robid[lq_remove_idx];
   assign lsq_wb_rd = lq_rd[lq_remove_idx];
   assign lsq_wb_result = lq_data[lq_remove_idx];
-
-  // rob interface
-  assign lsq_rob_write = sq_insert_beat;
-  assign lsq_rob_robid = rename_robid[6:0];
-  assign lsq_rob_lsqid = sq_tail;
 
   priarb #(16) lq_insert_arb(
     .req(~lq_valid),
@@ -335,7 +326,7 @@ module lsq(
       end
 
       if(rob_ret_store)
-        sq_issue_rdy[rob_ret_lsqid] <= 1;
+        sq_issue_rdy[sq_mid] <= 1;
 
       if(sq_issue_beat)
         sq_valid[sq_head] <= 0;
