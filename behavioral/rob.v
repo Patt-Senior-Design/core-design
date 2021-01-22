@@ -181,4 +181,14 @@ module rob(
     end
   end
 
+  always @(posedge clk)
+    if(ret_valid)
+      top.trace_rob_retire(
+        buf_head,
+        ret_addr,
+        ret_error,
+        ret_ecause,
+        ret_rd,
+        ret_result);
+
 endmodule

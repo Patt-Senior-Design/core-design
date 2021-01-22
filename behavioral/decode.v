@@ -252,4 +252,10 @@ module decode(
         rsop = {1'b0,fmt_r & insn[30],funct3};
     endcase
 
+  always @(posedge clk)
+    if(valid & ~decode_stall)
+      top.trace_decode(
+        decode_robid[6:0],
+        insn);
+
 endmodule

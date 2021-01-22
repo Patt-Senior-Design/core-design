@@ -88,6 +88,7 @@ module lsq(
   wire [15:0] lq_addrgen_sel, sq_addrgen_sel;
   reg         lq_addrgen_req_r, sq_addrgen_req_r;
   reg [15:0]  lq_addrgen_sel_r, sq_addrgen_sel_r;
+  reg [31:0]  lq_addrgen_addr, sq_addrgen_addr;
 
   wire        lq_issue_rdy;
   wire [15:0] lq_issue_sel, lq_sq_sel;
@@ -254,6 +255,12 @@ module lsq(
       sq_addrgen_sel_r <= sq_addrgen_sel;
     end
 
+  always @(*)
+    lq_addrgen_addr = lq_base[lq_addrgen_idx] + lq_imm[lq_addrgen_idx];
+
+  always @(*)
+    sq_addrgen_addr = sq_base[sq_addrgen_idx] + sq_imm[sq_addrgen_idx];
+
   // load queue
   integer j;
   always @(posedge clk)
@@ -275,7 +282,11 @@ module lsq(
 
       if(lq_addrgen_req_r) begin
         lq_addr_rdy[lq_addrgen_idx] <= 1;
-        lq_addr[lq_addrgen_idx] <= lq_base[lq_addrgen_idx] + lq_imm[lq_addrgen_idx];
+        lq_addr[lq_addrgen_idx] <= lq_addrgen_addr;
+
+        top.trace_lsq_addrgen(
+          {1'b0,lq_addrgen_idx[3:0]},
+          lq_addrgen_addr);
       end
 
       if(lq_issue_beat)
@@ -322,7 +333,11 @@ module lsq(
 
       if(sq_addrgen_req_r) begin
         sq_addr_rdy[sq_addrgen_idx] <= 1;
-        sq_addr[sq_addrgen_idx] <= sq_base[sq_addrgen_idx] + sq_imm[sq_addrgen_idx];
+        sq_addr[sq_addrgen_idx] <= sq_addrgen_addr;
+
+        top.trace_lsq_addrgen(
+          {1'b1,sq_addrgen_idx[3:0]},
+          sq_addrgen_addr);
       end
 
       if(rob_ret_store)
@@ -342,8 +357,19 @@ module lsq(
             if(~sq_data_rdy[k] & (sq_data[k][6:0] == wb_robid)) begin
               sq_data_rdy[k] <= 1;
               sq_data[k] <= wb_result;
+
+              top.trace_lsq_wdata(
+                {1'b1,k[3:0]},
+                wb_result);
             end
           end
     end
+
+  always @(posedge clk)
+    if(rename_beat)
+      top.trace_lsq_dispatch(
+        rename_robid[6:0],
+        rename_op[3] ? {1'b1,sq_tail} : {1'b0,lq_insert_idx},
+        rename_op);
 
 endmodule
