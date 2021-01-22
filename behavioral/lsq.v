@@ -18,6 +18,7 @@ module lsq(
   // dcache interface
   output        lsq_dc_req,
   output [3:0]  lsq_dc_op,
+  output [31:0] lsq_dc_addr,
   output [4:0]  lsq_dc_lsqid,
   output [31:0] lsq_dc_wdata,
   output        lsq_dc_flush,
@@ -51,8 +52,307 @@ module lsq(
   input         rob_ret_store,
   input [4:0]   rob_ret_lsqid);
 
-  assign lsq_stall = 0;
-  assign lsq_rob_write = 0;
-  assign lsq_wb_valid = 0;
+  // load queue
+  reg [15:0]  lq_valid;
+  reg [15:0]  lq_base_rdy;
+  reg [15:0]  lq_addr_rdy;
+  reg [15:0]  lq_issued;
+  reg [15:0]  lq_complete;
+  reg [15:0]  lq_error;
+  reg [15:0]  lq_ecause;
+  reg [2:0]   lq_type [0:15];
+  reg [6:0]   lq_robid [0:15];
+  reg [4:0]   lq_rd [0:15];
+  reg [31:0]  lq_base [0:15];
+  reg [31:0]  lq_imm [0:15];
+  reg [31:0]  lq_addr [0:15];
+  reg [31:0]  lq_data [0:15];
+
+  // store queue
+  reg [15:0]  sq_valid;
+  reg [15:0]  sq_base_rdy;
+  reg [15:0]  sq_addr_rdy;
+  reg [15:0]  sq_data_rdy;
+  reg [15:0]  sq_issue_rdy;
+  reg [2:0]   sq_type [0:15];
+  reg [31:0]  sq_base [0:15];
+  reg [31:0]  sq_imm [0:15];
+  reg [31:0]  sq_addr [0:15];
+  reg [31:0]  sq_data [0:15];
+
+  // insert at tail, retire at mid, issue/remove at head
+  // when a flush occurs, sq_tail <= sq_mid
+  reg [3:0]   sq_head, sq_mid, sq_tail;
+  reg         sq_head_pol, sq_mid_pol, sq_tail_pol;
+
+  wire        lq_insert_rdy;
+  wire [15:0] lq_insert_sel;
+
+  wire        lq_addrgen_req, sq_addrgen_req;
+  wire [15:0] lq_addrgen_sel, sq_addrgen_sel;
+  reg         lq_addrgen_req_r, sq_addrgen_req_r;
+  reg [15:0]  lq_addrgen_sel_r, sq_addrgen_sel_r;
+
+  wire        lq_issue_rdy;
+  wire [15:0] lq_issue_sel, lq_sq_sel;
+
+  wire        lq_remove_rdy;
+  wire [15:0] lq_remove_sel;
+
+  // derived signals
+  wire        sq_full;
+  assign sq_full = (sq_head == sq_tail) & (sq_head_pol != sq_tail_pol);
+
+  wire        sq_insert_rdy;
+  wire [15:0] sq_insert_sel;
+  assign sq_insert_rdy = ~sq_full;
+  assign sq_insert_sel = 1 << sq_tail;
+
+  wire rename_beat, lq_insert_beat, sq_insert_beat;
+  assign rename_beat = rename_lsq_write & ~lsq_stall;
+  assign lq_insert_beat = rename_beat & ~rename_op[3];
+  assign sq_insert_beat = rename_beat & rename_op[3];
+
+  wire lq_issue_req, sq_issue_req;
+  assign lq_issue_req = lq_issue_rdy & ~lq_sq_hit;
+  assign sq_issue_req = |(sq_valid & sq_issue_rdy);
+
+  wire lq_issue_beat, sq_issue_beat;
+  assign lq_issue_beat = lq_issue_req & dcache_ready;
+  assign sq_issue_beat = sq_issue_req & ~lq_issue_req & dcache_ready;
+
+  wire wb_beat;
+  assign wb_beat = lsq_wb_valid & ~wb_lsq_stall;
+
+  integer lq_insert_idx;
+  always @(*)
+    lq_insert_idx = $clog2(lq_insert_sel);
+
+  integer lq_addrgen_idx;
+  always @(*)
+    lq_addrgen_idx = $clog2(lq_addrgen_sel_r);
+
+  integer lq_issue_idx;
+  always @(*)
+    lq_issue_idx = $clog2(lq_issue_sel);
+
+  integer lq_remove_idx;
+  always @(*)
+    lq_remove_idx = $clog2(lq_remove_sel);
+
+  integer sq_addrgen_idx;
+  always @(*)
+    sq_addrgen_idx = $clog2(sq_addrgen_sel_r);
+
+  integer    i;
+  reg [31:2] lq_sq_addr;
+  reg        lq_sq_hit;
+  always @(*) begin
+    lq_sq_addr = 0;
+    for(i = 0; i < 16; i=i+1)
+      if(lq_issue_sel[i])
+        lq_sq_addr = lq_sq_addr | lq_addr[i][31:2];
+
+    lq_sq_hit = 0;
+    for(i = 0; i < 16; i=i+1)
+      if(lq_sq_sel[i] & (~sq_addr_rdy[i] | (sq_addr[i][31:2] == lq_sq_addr))) begin
+        lq_sq_hit = 1;
+        i = 16;
+      end
+  end
+
+  // rename interface
+  assign lsq_stall = ~lq_insert_rdy | ~sq_insert_rdy;
+
+  // dcache interface
+  assign lsq_dc_req = lq_issue_req | sq_issue_req;
+  assign lsq_dc_op = lq_issue_req ? {lq_type[lq_issue_idx],1'b0} : {sq_type[sq_head],1'b1};
+  assign lsq_dc_addr = lq_issue_req ? lq_addr[lq_issue_idx] : sq_addr[sq_head];
+  assign lsq_dc_lsqid = lq_issue_idx;
+  assign lsq_dc_wdata = sq_data[sq_head];
+  assign lsq_dc_flush = rob_flush;
+
+  // writeback interface (out)
+  assign lsq_wb_valid = lq_remove_rdy;
+  assign lsq_wb_error = lq_error[lq_remove_idx];
+  assign lsq_wb_ecause = lq_ecause[lq_remove_idx];
+  assign lsq_wb_robid = lq_robid[lq_remove_idx];
+  assign lsq_wb_rd = lq_rd[lq_remove_idx];
+  assign lsq_wb_result = lq_data[lq_remove_idx];
+
+  // rob interface
+  assign lsq_rob_write = sq_insert_beat;
+  assign lsq_rob_robid = rename_robid[6:0];
+  assign lsq_rob_lsqid = sq_tail;
+
+  priarb #(16) lq_insert_arb(
+    .req(~lq_valid),
+    .grant_valid(lq_insert_rdy),
+    .grant(lq_insert_sel));
+
+  priarb #(16) lq_addrgen_arb(
+    .req(lq_valid & lq_base_rdy & ~lq_addr_rdy),
+    .grant_valid(lq_addrgen_req),
+    .grant(lq_addrgen_sel));
+
+  agemat #(16) lq_issue_arb(
+    .clk(clk),
+    .rst(rst),
+    .insert_valid(lq_insert_beat),
+    .insert_sel(lq_insert_sel),
+    .req(lq_valid & lq_addr_rdy & ~lq_issued),
+    .grant_valid(lq_issue_rdy),
+    .grant(lq_issue_sel));
+
+  agearr #(16,16) lq_sq_agearr(
+    .clk(clk),
+    .rst(rst),
+    .set_row_valid(lq_insert_beat),
+    .set_row_sel(lq_insert_sel),
+    .clear_col_valid(sq_insert_beat),
+    .clear_col_sel(sq_insert_sel),
+    .row_sel(lq_issue_sel),
+    .col_sel(lq_sq_sel));
+
+  priarb #(16) lq_remove_arb(
+    .req(lq_valid & lq_complete),
+    .grant_valid(lq_remove_rdy),
+    .grant(lq_remove_sel));
+
+  priarb #(16) sq_addrgen_arb(
+    .req(sq_valid & sq_base_rdy & ~sq_addr_rdy),
+    .grant_valid(sq_addrgen_req),
+    .grant(sq_addrgen_sel));
+
+  // sq_head
+  always @(posedge clk)
+    if(rst) begin
+      sq_head <= 0;
+      sq_head_pol <= 0;
+    end else if(sq_issue_beat)
+      {sq_head_pol,sq_head} <= {sq_head_pol,sq_head} + 1;
+
+  // sq_mid
+  always @(posedge clk)
+    if(rst) begin
+      sq_mid <= 0;
+      sq_mid_pol <= 0;
+    end else if(rob_ret_store)
+      {sq_mid_pol,sq_mid} <= {sq_mid_pol,sq_mid} + 1;
+
+  // sq_tail
+  always @(posedge clk)
+    if(rst) begin
+      sq_tail <= 0;
+      sq_tail_pol <= 0;
+    end else if(rob_flush) begin
+      sq_tail <= sq_mid;
+      sq_tail_pol <= sq_mid_pol;
+    end else if(sq_insert_beat)
+      {sq_tail_pol,sq_tail} <= {sq_tail_pol,sq_tail} + 1;
+
+  // addrgen
+  always @(posedge clk)
+    if(rst) begin
+      lq_addrgen_req_r <= 0;
+      sq_addrgen_req_r <= 0;
+    end else begin
+      lq_addrgen_req_r <= lq_addrgen_req;
+      sq_addrgen_req_r <= sq_addrgen_req;
+      lq_addrgen_sel_r <= lq_addrgen_sel;
+      sq_addrgen_sel_r <= sq_addrgen_sel;
+    end
+
+  // load queue
+  integer j;
+  always @(posedge clk)
+    if(rst | rob_flush)
+      lq_valid <= 0;
+    else begin
+      if(lq_insert_beat) begin
+        lq_valid[lq_insert_idx] <= 1;
+        lq_base_rdy[lq_insert_idx] <= rename_op1ready;
+        lq_addr_rdy[lq_insert_idx] <= 0;
+        lq_issued[lq_insert_idx] <= 0;
+        lq_complete[lq_insert_idx] <= 0;
+        lq_type[lq_insert_idx] <= rename_op[2:0];
+        lq_robid[lq_insert_idx] <= rename_robid[6:0];
+        lq_rd[lq_insert_idx] <= rename_rd[4:0];
+        lq_base[lq_insert_idx] <= rename_op1;
+        lq_imm[lq_insert_idx] <= rename_imm;
+      end
+
+      if(lq_addrgen_req_r) begin
+        lq_addr_rdy[lq_addrgen_idx] <= 1;
+        lq_addr[lq_addrgen_idx] <= lq_base[lq_addrgen_idx] + lq_imm[lq_addrgen_idx];
+      end
+
+      if(lq_issue_beat)
+        lq_issued[lq_issue_idx] <= 1;
+
+      if(dcache_valid) begin
+        lq_complete[dcache_lsqid] <= 1;
+        lq_error[dcache_lsqid] <= dcache_error;
+        lq_ecause[dcache_lsqid] <= 0; // TODO
+        lq_data[dcache_lsqid] <= dcache_rdata;
+      end
+
+      if(wb_beat)
+        lq_valid[lq_remove_idx] <= 0;
+
+      if(wb_valid & ~wb_error)
+        for(j = 0; j < 16; j=j+1)
+          if(lq_valid[j] & ~lq_base_rdy[j] & (lq_base[j][6:0] == wb_robid)) begin
+            lq_base_rdy[j] <= 1;
+            lq_base[j] <= wb_result;
+          end
+    end
+
+  // store queue
+  integer k;
+  always @(posedge clk)
+    if(rst)
+      sq_valid <= 0;
+    else if(rob_flush)
+      // preserve retired but not yet issued insns
+      sq_valid <= sq_valid & sq_issue_rdy;
+    else begin
+      if(sq_insert_beat) begin
+        sq_valid[sq_tail] <= 1;
+        sq_base_rdy[sq_tail] <= rename_op1ready;
+        sq_addr_rdy[sq_tail] <= 0;
+        sq_data_rdy[sq_tail] <= rename_op2ready;
+        sq_issue_rdy[sq_tail] <= 0;
+        sq_type[sq_tail] <= rename_op[2:0];
+        sq_base[sq_tail] <= rename_op1;
+        sq_imm[sq_tail] <= rename_imm;
+        sq_data[sq_tail] <= rename_op2;
+      end
+
+      if(sq_addrgen_req_r) begin
+        sq_addr_rdy[sq_addrgen_idx] <= 1;
+        sq_addr[sq_addrgen_idx] <= sq_base[sq_addrgen_idx] + sq_imm[sq_addrgen_idx];
+      end
+
+      if(rob_ret_store)
+        sq_issue_rdy[rob_ret_lsqid] <= 1;
+
+      if(sq_issue_beat)
+        sq_valid[sq_head] <= 0;
+
+      if(wb_valid & ~wb_error)
+        for(k = 0; k < 16; k=k+1)
+          if(sq_valid[k]) begin
+            if(~sq_base_rdy[k] & (sq_base[k][6:0] == wb_robid)) begin
+              sq_base_rdy[k] <= 1;
+              sq_base[k] <= wb_result;
+            end
+
+            if(~sq_data_rdy[k] & (sq_data[k][6:0] == wb_robid)) begin
+              sq_data_rdy[k] <= 1;
+              sq_data[k] <= wb_result;
+            end
+          end
+    end
 
 endmodule
