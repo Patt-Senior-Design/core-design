@@ -108,18 +108,19 @@ module rat(
       comm_val_rs2 <= rename_rat_rs2 ? rat_comm_val[rename_rat_rs2] : 0;
       tag_rs1 <= rat_tag[rename_rat_rs1];
       tag_rs2 <= rat_tag[rename_rat_rs2];
-      tag_wb <= rat_tag[wb_rd[4:0]];
       spec_val_rs1 <= (ld_spec_val & (rename_rat_rs1 == wb_prev_rd)) ?
                         wb_prev_result : (rename_rat_rs1 ? rat_spec_val[rename_rat_rs1] : 0);
       spec_val_rs2 <= (ld_spec_val & (rename_rat_rs2 == wb_prev_rd)) ?
                         wb_prev_result : (rename_rat_rs2 ? rat_spec_val[rename_rat_rs2] : 0);
     end
+    if (wb_write)
+      tag_wb <= rat_tag[wb_rd[4:0]];
     if (rob_ret_valid)
       rat_comm_val[rob_ret_rd] <= rob_ret_result;
     if (ld_tag)
       rat_tag[rename_rat_rd[4:0]] <= rename_rat_robid[6:0];
     if (ld_spec_val)
-      rat_spec_val[wb_rd[4:0]] <= wb_prev_result;
+      rat_spec_val[wb_prev_rd[4:0]] <= wb_prev_result;
   end
 
   always @(posedge clk) begin
