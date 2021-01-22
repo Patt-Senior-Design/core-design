@@ -116,40 +116,50 @@ module wb(
     end
     else begin
       // CSR uses scalu0
-      scalu0_valid_r <= csr_valid | scalu0_valid;
-      scalu0_error_r <= (csr_valid ? csr_error : scalu0_error);
-      scalu0_ecause_r <= (csr_valid ? csr_ecause : scalu0_ecause);
-      scalu0_robid_r <= (csr_valid ? csr_robid : scalu0_robid);
-      scalu0_rd_r <= (csr_valid ? csr_rd : scalu0_rd);
-      scalu0_result_r <= (csr_valid ? csr_result : scalu0_result);
+      if(~wb_scalu0_stall) begin
+        scalu0_valid_r <= csr_valid | scalu0_valid;
+        scalu0_error_r <= (csr_valid ? csr_error : scalu0_error);
+        scalu0_ecause_r <= (csr_valid ? csr_ecause : scalu0_ecause);
+        scalu0_robid_r <= (csr_valid ? csr_robid : scalu0_robid);
+        scalu0_rd_r <= (csr_valid ? csr_rd : scalu0_rd);
+        scalu0_result_r <= (csr_valid ? csr_result : scalu0_result);
+      end
 
-      scalu1_valid_r <= scalu1_valid;
-      scalu1_error_r <= scalu1_error;
-      scalu1_ecause_r <= scalu1_ecause;
-      scalu1_robid_r <= scalu1_robid;
-      scalu1_rd_r <= scalu1_rd;
-      scalu1_result_r <= scalu1_result;
+      if(~wb_scalu1_stall) begin
+        scalu1_valid_r <= scalu1_valid;
+        scalu1_error_r <= scalu1_error;
+        scalu1_ecause_r <= scalu1_ecause;
+        scalu1_robid_r <= scalu1_robid;
+        scalu1_rd_r <= scalu1_rd;
+        scalu1_result_r <= scalu1_result;
+      end
 
-      mcalu0_valid_r <= mcalu0_valid;
-      mcalu0_error_r <= mcalu0_error;
-      mcalu0_ecause_r <= mcalu0_ecause;
-      mcalu0_robid_r <= mcalu0_robid;
-      mcalu0_rd_r <= mcalu0_rd;
-      mcalu0_result_r <= mcalu0_result;
+      if(~wb_mcalu0_stall) begin
+        mcalu0_valid_r <= mcalu0_valid;
+        mcalu0_error_r <= mcalu0_error;
+        mcalu0_ecause_r <= mcalu0_ecause;
+        mcalu0_robid_r <= mcalu0_robid;
+        mcalu0_rd_r <= mcalu0_rd;
+        mcalu0_result_r <= mcalu0_result;
+      end
 
-      mcalu1_valid_r <= mcalu1_valid;
-      mcalu1_error_r <= mcalu1_error;
-      mcalu1_ecause_r <= mcalu1_ecause;
-      mcalu1_robid_r <= mcalu1_robid;
-      mcalu1_rd_r <= mcalu1_rd;
-      mcalu1_result_r <= mcalu1_result;
+      if(~wb_mcalu1_stall) begin
+        mcalu1_valid_r <= mcalu1_valid;
+        mcalu1_error_r <= mcalu1_error;
+        mcalu1_ecause_r <= mcalu1_ecause;
+        mcalu1_robid_r <= mcalu1_robid;
+        mcalu1_rd_r <= mcalu1_rd;
+        mcalu1_result_r <= mcalu1_result;
+      end
 
-      lsq_valid_r <= lsq_wb_valid;
-      lsq_error_r <= lsq_wb_error;
-      lsq_ecause_r <= lsq_wb_ecause;
-      lsq_robid_r <= lsq_wb_robid;
-      lsq_rd_r <= lsq_wb_rd;
-      lsq_result_r <= lsq_wb_result;
+      if(~wb_lsq_stall) begin
+        lsq_valid_r <= lsq_wb_valid;
+        lsq_error_r <= lsq_wb_error;
+        lsq_ecause_r <= lsq_wb_ecause;
+        lsq_robid_r <= lsq_wb_robid;
+        lsq_rd_r <= lsq_wb_rd;
+        lsq_result_r <= lsq_wb_result;
+      end
     end
   end
 
