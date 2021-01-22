@@ -183,7 +183,7 @@ module lsq(
     .grant(lq_insert_sel));
 
   priarb #(16) lq_addrgen_arb(
-    .req(lq_valid & lq_base_rdy & ~lq_addr_rdy),
+    .req(lq_valid & lq_base_rdy & ~lq_addr_rdy & ~lq_addrgen_sel_r),
     .grant_valid(lq_addrgen_req),
     .grant(lq_addrgen_sel));
 
@@ -212,7 +212,7 @@ module lsq(
     .grant(lq_remove_sel));
 
   priarb #(16) sq_addrgen_arb(
-    .req(sq_valid & sq_base_rdy & ~sq_addr_rdy),
+    .req(sq_valid & sq_base_rdy & ~sq_addr_rdy & ~sq_addrgen_sel_r),
     .grant_valid(sq_addrgen_req),
     .grant(sq_addrgen_sel));
 

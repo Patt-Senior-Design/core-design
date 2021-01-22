@@ -131,7 +131,7 @@ module decode(
   assign decode_rd = {~uses_rd,insn[11:7]};
 
   // rob interface
-  assign decode_rob_valid = valid;
+  assign decode_rob_valid = valid & ~rename_stall;
   assign decode_error = error | fmt_inv;
   assign decode_ecause = error ? (addr[1] ? ERR_IALIGN : ERR_IFAULT) : ERR_IILLEGAL;
   assign decode_retop = {fmt_b,funct3[0],insn_jalr,fmt_s,funct3};
@@ -140,7 +140,7 @@ module decode(
   assign decode_target = target[31:2];
 
   // rename interface
-  assign decode_rename_valid = valid & ~decode_error;
+  assign decode_rename_valid = valid & ~decode_error & ~rob_full;
   assign decode_rsop = rsop;
   assign decode_robid = rob_robid;
   assign decode_uses_rs1 = uses_rs1;
