@@ -249,7 +249,7 @@ module decode(
       fmt_b:
         rsop = {2'b01,brop};
       default:
-        rsop = {1'b0,insn[30],funct3};
+        rsop = {1'b0,fmt_r & insn[30],funct3};
     endcase
 
 endmodule
