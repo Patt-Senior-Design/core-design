@@ -9,7 +9,7 @@ build/top: $(SRCS) build/cpu.v
 
 build/cpu.v: $(SRCS) | build
 	@rm -f build/cpu.v
-	emacs --batch --file=build/cpu.v --insert=../cpu.v.in --eval='(push ".." verilog-library-directories)' -f verilog-auto -f save-buffer
+	emacs -Q --batch --file=build/cpu.v --insert=../cpu.v.in --eval='(push ".." verilog-library-directories)' -f verilog-auto -f save-buffer
 
 build:
 	mkdir build
