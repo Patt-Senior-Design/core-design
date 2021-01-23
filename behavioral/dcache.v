@@ -16,18 +16,11 @@ module dcache(
   output [3:0]  dcache_lsqid,
   output [31:0] dcache_rdata);
 
-  reg [31:0] storage [0:1048575]; // 4MB
-
-  integer i;
-  initial
-    for(i = 0; i < 1048576; i=i+1)
-      storage[i] = 0;
-
   reg        req_s0, req_s1;
   reg [3:0]  op_s0, op_s1;
   reg [31:0] addr_s0, addr_s1;
   reg [3:0]  lsqid_s0, lsqid_s1;
-  reg [31:0] wdata_s0, rdata_s1;
+  reg [31:0] wdata_s0, rdata_raw, rdata_s1;
   always @(posedge clk)
     if(rst | lsq_dc_flush) begin
       req_s0 <= 0;
@@ -48,26 +41,28 @@ module dcache(
           // store op
           case(op_s0[2:1])
             2'b00: // SB
-              storage[addr_s0[21:2]][addr_s0[1:0]*8+:8] <= wdata_s0[7:0];
+              top.mem_write(addr_s0[31:2], 4'b0001 << addr_s0[1:0], wdata_s0 << (addr_s0[1:0]*8));
             2'b01: // SH
-              storage[addr_s0[21:2]][addr_s0[1]*16+:16] <= wdata_s0[15:0];
+              top.mem_write(addr_s0[31:2], 4'b0011 << (addr_s0[1]*2), wdata_s0 << (addr_s0[1]*16));
             default: // SW
-              storage[addr_s0[21:2]] <= wdata_s0;
+              top.mem_write(addr_s0[31:2], 4'b1111, wdata_s0);
           endcase
-        else
+        else begin
           // load op
+          top.mem_read(addr_s0[31:2], rdata_raw);
           case(op_s0[3:1])
             3'b000: // LB
-              rdata_s1 = $signed(storage[addr_s0[21:2]][addr_s0[1:0]*8+:8]);
+              rdata_s1 <= $signed(rdata_raw[addr_s0[1:0]*8+:8]);
             3'b100: // LBU
-              rdata_s1 = storage[addr_s0[21:2]][addr_s0[1:0]*8+:8];
+              rdata_s1 <= rdata_raw[addr_s0[1:0]*8+:8];
             3'b001: // LH
-              rdata_s1 = $signed(storage[addr_s0[21:2]][addr_s0[1]*16+:16]);
+              rdata_s1 <= $signed(rdata_raw[addr_s0[1]*16+:16]);
             3'b101: // LHU
-              rdata_s1 = storage[addr_s0[21:2]][addr_s0[1]*16+:16];
+              rdata_s1 <= rdata_raw[addr_s0[1]*16+:16];
             default: // LW
-              rdata_s1 = storage[addr_s0[21:2]];
+              rdata_s1 <= rdata_raw;
           endcase
+        end
     end
 
   assign dcache_ready = 1;

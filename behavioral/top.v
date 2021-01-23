@@ -9,6 +9,73 @@ module top();
   always
     #5 clk = ~clk;
 
+  initial begin
+    clk = 0;
+    rst = 1;
+    #100;
+    rst = 0;
+  end
+
+  // memories for use by the caches
+  localparam
+    ROM_BASE = 32'h10000000/4,
+    ROM_SIZE = (64*1024)/4,
+    RAM_BASE = 32'h20000000/4,
+    RAM_SIZE = (4*1024*1024)/4;
+
+  reg [31:0] mem_rom [0:ROM_SIZE-1];
+  reg [31:0] mem_ram [0:RAM_SIZE-1];
+
+  reg [128*8-1:0] memfile;
+  integer i, fd;
+  initial begin
+    for(i = 0; i < ROM_SIZE; i=i+1)
+      mem_rom[i] = 0;
+    for(i = 0; i < RAM_SIZE; i=i+1)
+      mem_ram[i] = 0;
+
+    if(!$value$plusargs("memfile=%s", memfile))
+      memfile = "memory.hex";
+
+    fd = $fopen(memfile, "r");
+    if(!fd) begin
+      $fdisplay(STDERR, "Cannot open memfile %0s", memfile);
+      $finish;
+    end
+    $fclose(fd);
+
+    $readmemh(memfile, mem_rom);
+  end
+
+  task automatic mem_read(
+    input [31:2]      addr,
+    output reg [31:0] rdata);
+
+    begin
+      if(addr >= ROM_BASE && addr < (ROM_BASE+ROM_SIZE))
+        rdata = mem_rom[addr-ROM_BASE];
+      else if(addr >= RAM_BASE && addr < (RAM_BASE+RAM_SIZE))
+        rdata = mem_ram[addr-RAM_BASE];
+      else
+        rdata = 0;
+    end
+  endtask
+
+  task mem_write(
+    input [31:2] addr,
+    input [3:0]  wmask,
+    input [31:0] wdata);
+
+    integer i;
+    begin
+      if(addr >= RAM_BASE && addr < (RAM_BASE+RAM_SIZE))
+        for(i = 0; i < 4; i=i+1)
+          if(wmask[i])
+            mem_ram[addr-RAM_BASE][i*8+:8] = wdata[i*8+:8];
+    end
+  endtask
+
+  localparam STDOUT = 32'h80000001;
   localparam STDERR = 32'h80000002;
 
   reg [128*8-1:0] tracefile;
@@ -17,7 +84,7 @@ module top();
     $dumpfile("top.vcd");
     $dumpvars;
 
-    tracefd = 0;
+    tracefd = STDOUT;
     if($value$plusargs("tracefile=%s", tracefile)) begin
       tracefd = $fopen(tracefile, "w");
       if(!tracefd) begin
@@ -25,11 +92,6 @@ module top();
         $finish;
       end
     end
-
-    clk = 0;
-    rst = 1;
-    #100;
-    rst = 0;
   end
 
   // indexed by robid
