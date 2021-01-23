@@ -175,7 +175,7 @@ module wb(
                   wb_rd = lsq_rd_r;
                   wb_result = lsq_result_r;
                 end
-      5'b01??: begin 
+      5'b01???: begin 
                   fu_arbitrated = 5'b01000;
                   wb_error = mcalu1_error_r;
                   wb_ecause = mcalu1_ecause_r; 
