@@ -111,8 +111,8 @@ module lsq(
   assign sq_insert_beat = rename_beat & rename_op[3];
 
   wire lq_issue_req, sq_issue_req;
-  assign lq_issue_req = lq_issue_rdy & ~lq_sq_hit;
-  assign sq_issue_req = |(sq_valid & sq_issue_rdy);
+  assign lq_issue_req = lq_issue_rdy & ~lq_sq_hit & ~rob_flush;
+  assign sq_issue_req = sq_valid[sq_head] & sq_addr_rdy[sq_head] & sq_issue_rdy[sq_head] & ~rob_flush;
 
   wire lq_issue_beat, sq_issue_beat;
   assign lq_issue_beat = lq_issue_req & dcache_ready;
