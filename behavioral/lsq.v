@@ -329,6 +329,11 @@ module lsq(
         sq_base[sq_tail] <= rename_op1;
         sq_imm[sq_tail] <= rename_imm;
         sq_data[sq_tail] <= rename_op2;
+
+        if(rename_op2ready)
+          top.trace_lsq_wdata(
+            {1'b1,sq_tail},
+            rename_op2);
       end
 
       if(sq_addrgen_req_r) begin

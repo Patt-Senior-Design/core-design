@@ -120,15 +120,15 @@ module rat(
     if (ld_tag)
       rat_tag[rename_rat_rd[4:0]] <= rename_rat_robid;
     if (ld_spec_val)
-      rat_spec_val[wb_prev_rd[4:0]] <= wb_prev_result;
+      rat_spec_val[wb_prev_rd] <= wb_prev_result;
   end
 
   always @(posedge clk) begin
     if (rename_rat_valid) begin
       // Read control bits: Forward if insn in decode and 2nd wb cycle
-      valid_rs1 <= (wb_prev_write & (rename_rat_rs1 == wb_prev_rd)) ?
+      valid_rs1 <= (ld_spec_val & (rename_rat_rs1 == wb_prev_rd)) ?
                     1'b1 : rat_valid[rename_rat_rs1];
-      valid_rs2 <= (wb_prev_write & (rename_rat_rs2 == wb_prev_rd)) ?
+      valid_rs2 <= (ld_spec_val & (rename_rat_rs2 == wb_prev_rd)) ?
                     1'b1 : rat_valid[rename_rat_rs2];
       committed_rs1 <= rat_committed[rename_rat_rs1];
       committed_rs2 <= rat_committed[rename_rat_rs2];

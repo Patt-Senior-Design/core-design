@@ -119,9 +119,12 @@ module decode(
   assign uses_rs1 = fmt_r | (fmt_i & (~insn_csr | ~funct3[2])) | fmt_s | fmt_b;
   assign uses_rs2 = fmt_r | fmt_s | fmt_b;
 
+  wire target_ntaken;
+  assign target_ntaken = fmt_b & bptaken;
+
   // TODO misaligned target?
   wire [31:1] target;
-  assign target = {addr[31:2],1'b0} + imm[31:1];
+  assign target = {addr[31:2],1'b0} + (target_ntaken ? 31'd2 : imm[31:1]);
 
   // fetch interface
   assign decode_stall = rob_full | rename_stall;
