@@ -152,7 +152,7 @@ module lsq(
 
     lq_sq_hit = 0;
     for(i = 0; i < 16; i=i+1)
-      if(lq_sq_sel[i] & (~sq_addr_rdy[i] | (sq_addr[i][31:2] == lq_sq_addr))) begin
+      if(lq_sq_sel[i] & sq_valid[i] & (~sq_addr_rdy[i] | (sq_addr[i][31:2] == lq_sq_addr))) begin
         lq_sq_hit = 1;
         i = 16;
       end
