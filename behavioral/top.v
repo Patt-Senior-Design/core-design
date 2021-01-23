@@ -10,41 +10,69 @@ module top();
     #5 clk = ~clk;
 
   initial begin
+    $dumpfile("top.vcd");
+    $dumpvars;
+
     clk = 0;
     rst = 1;
     #100;
     rst = 0;
   end
 
-  // memories for use by the caches
+  // standard fds
+  localparam STDOUT = 32'h80000001;
+  localparam STDERR = 32'h80000002;
+
+  // memory map constants
   localparam
-    ROM_BASE = 32'h10000000/4,
-    ROM_SIZE = (64*1024)/4,
-    RAM_BASE = 32'h20000000/4,
-    RAM_SIZE = (4*1024*1024)/4;
+    ROM_BASE   = 32'h10000000/4,
+    ROM_SIZE   = (64*1024)/4,
+    RAM_BASE   = 32'h20000000/4,
+    RAM_SIZE   = (4*1024*1024)/4,
+    DBG_TOHOST = 32'h30000000/4;
+
+  task automatic openargfile(
+    input [16*8-1:0] argname,
+    input [3*8-1:0]  mode,
+    output integer   fd,
+    input integer    defaultfd);
+
+    reg [19*8-1:0]  argstr;
+    reg [128*8-1:0] argfile;
+    begin
+      fd = defaultfd;
+      $swrite(argstr, "%0s=%%s", argname);
+      if($value$plusargs(argstr, argfile)) begin
+        fd = $fopen(argfile, mode);
+        if(!fd) begin
+          $fdisplay(STDERR, "Cannot open file %0s", argfile);
+          $finish;
+        end
+      end
+    end
+  endtask
 
   reg [31:0] mem_rom [0:ROM_SIZE-1];
   reg [31:0] mem_ram [0:RAM_SIZE-1];
 
   reg [128*8-1:0] memfile;
-  integer i, fd;
+  integer         i, memfd;
   initial begin
     for(i = 0; i < ROM_SIZE; i=i+1)
       mem_rom[i] = 0;
     for(i = 0; i < RAM_SIZE; i=i+1)
       mem_ram[i] = 0;
 
-    if(!$value$plusargs("memfile=%s", memfile))
-      memfile = "memory.hex";
+    if($value$plusargs("memfile=%s", memfile)) begin
+      memfd = $fopen(memfile, "r");
+      if(!memfd) begin
+        $fdisplay(STDERR, "Cannot open memfile %0s", memfile);
+        $finish;
+      end
+      $fclose(memfd);
 
-    fd = $fopen(memfile, "r");
-    if(!fd) begin
-      $fdisplay(STDERR, "Cannot open memfile %0s", memfile);
-      $finish;
+      $readmemh(memfile, mem_rom);
     end
-    $fclose(fd);
-
-    $readmemh(memfile, mem_rom);
   end
 
   task automatic mem_read(
@@ -75,23 +103,10 @@ module top();
     end
   endtask
 
-  localparam STDOUT = 32'h80000001;
-  localparam STDERR = 32'h80000002;
-
-  reg [128*8-1:0] tracefile;
-  integer         tracefd;
+  integer         tracefd, logfd;
   initial begin
-    $dumpfile("top.vcd");
-    $dumpvars;
-
-    tracefd = STDOUT;
-    if($value$plusargs("tracefile=%s", tracefile)) begin
-      tracefd = $fopen(tracefile, "w");
-      if(!tracefd) begin
-        $fdisplay(STDERR, "Cannot open tracefile %0s", tracefile);
-        $finish;
-      end
-    end
+    openargfile("tracefile", "w", tracefd, STDOUT);
+    openargfile("logfile", "w", logfd, 0);
   end
 
   // indexed by robid
@@ -167,30 +182,33 @@ module top();
     begin
       memaddr = trace_membase[robid] + trace_imm[robid];
 
-      $fwrite(tracefd, "core   0: 3 0x%08x (0x%08x)", {addr,2'b0}, trace_insn[robid]);
+      $fwrite(tracefd, "core   0: 3 0x%x (0x%x)", {addr,2'b0}, trace_insn[robid]);
       if(error)
         $fwrite(tracefd, " error %0d", ecause);
       else begin
         if(~rd[5])
-          $fwrite(tracefd, " x%2d 0x%08x", rd[4:0], result);
+          $fwrite(tracefd, " x%d 0x%x", rd[4:0], result);
         if(trace_uses_mem[robid]) begin
-          $fwrite(tracefd, " mem 0x%08x", memaddr);
+          $fwrite(tracefd, " mem 0x%x", memaddr);
           if(trace_memop[robid][3])
             case(trace_memop[robid][1:0])
               2'b00: // byte write
-                // needs to be 01 rather than 02 to match spike
-                $fwrite(tracefd, " 0x%01x", trace_memdata[robid]);
+                // needs to be %0x to match spike
+                $fwrite(tracefd, " 0x%0x", trace_memdata[robid][7:0]);
               2'b01: // halfword write
-                $fwrite(tracefd, " 0x%04x", trace_memdata[robid]);
+                $fwrite(tracefd, " 0x%x", trace_memdata[robid][15:0]);
               default: // word write
-                $fwrite(tracefd, " 0x%08x", trace_memdata[robid]);
+                $fwrite(tracefd, " 0x%x", trace_memdata[robid]);
             endcase
         end
       end
       $fdisplay(tracefd);
 
+      if(logfd)
+        $fdisplay(logfd, "%d: retire insn %x at addr %x (%x)", $stime, trace_insn[robid], {addr,2'b0}, addr);
+
       // htif tohost write termination
-      if(~error & trace_uses_mem[robid] & trace_memop[robid][3] & (memaddr == 32'h30000000))
+      if(~error & trace_uses_mem[robid] & trace_memop[robid][3] & (memaddr[31:2] == DBG_TOHOST))
         $finish;
     end
   endtask
