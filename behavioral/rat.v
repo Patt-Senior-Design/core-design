@@ -114,7 +114,7 @@ module rat(
                         wb_prev_result : (rename_rat_rs2 ? rat_spec_val[rename_rat_rs2] : 0);
     end
     if (wb_write)
-      tag_wb <= rat_tag[wb_rd[4:0]];
+      tag_wb <= (ld_tag & (rename_rat_rd[4:0] == wb_rd[4:0])) ? rename_rat_robid : rat_tag[wb_rd[4:0]];
     if (rob_ret_valid)
       rat_comm_val[rob_ret_rd] <= rob_ret_result;
     if (ld_tag)
