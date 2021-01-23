@@ -283,10 +283,6 @@ module lsq(
       if(lq_addrgen_req_r) begin
         lq_addr_rdy[lq_addrgen_idx] <= 1;
         lq_addr[lq_addrgen_idx] <= lq_addrgen_addr;
-
-        top.trace_lsq_addrgen(
-          {1'b0,lq_addrgen_idx[3:0]},
-          lq_addrgen_addr);
       end
 
       if(lq_issue_beat)
@@ -307,6 +303,10 @@ module lsq(
           if(lq_valid[j] & ~lq_base_rdy[j] & (lq_base[j][6:0] == wb_robid)) begin
             lq_base_rdy[j] <= 1;
             lq_base[j] <= wb_result;
+
+            top.trace_lsq_base(
+              {1'b0,j[3:0]},
+              wb_result);
           end
     end
 
@@ -329,20 +329,11 @@ module lsq(
         sq_base[sq_tail] <= rename_op1;
         sq_imm[sq_tail] <= rename_imm;
         sq_data[sq_tail] <= rename_op2;
-
-        if(rename_op2ready)
-          top.trace_lsq_wdata(
-            {1'b1,sq_tail},
-            rename_op2);
       end
 
       if(sq_addrgen_req_r) begin
         sq_addr_rdy[sq_addrgen_idx] <= 1;
         sq_addr[sq_addrgen_idx] <= sq_addrgen_addr;
-
-        top.trace_lsq_addrgen(
-          {1'b1,sq_addrgen_idx[3:0]},
-          sq_addrgen_addr);
       end
 
       if(rob_ret_store)
@@ -357,6 +348,10 @@ module lsq(
             if(~sq_base_rdy[k] & (sq_base[k][6:0] == wb_robid)) begin
               sq_base_rdy[k] <= 1;
               sq_base[k] <= wb_result;
+
+              top.trace_lsq_base(
+                {1'b1,k[3:0]},
+                wb_result);
             end
 
             if(~sq_data_rdy[k] & (sq_data[k][6:0] == wb_robid)) begin
@@ -375,6 +370,8 @@ module lsq(
       top.trace_lsq_dispatch(
         rename_robid,
         rename_op[3] ? {1'b1,sq_tail} : {1'b0,lq_insert_idx},
-        rename_op);
+        rename_op,
+        rename_op1,
+        rename_op2);
 
 endmodule

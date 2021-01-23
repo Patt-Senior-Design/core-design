@@ -259,6 +259,7 @@ module decode(
     if(valid & ~decode_stall)
       top.trace_decode(
         decode_robid,
-        insn);
+        insn,
+        imm);
 
 endmodule

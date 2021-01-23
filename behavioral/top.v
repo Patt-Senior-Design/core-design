@@ -34,9 +34,10 @@ module top();
 
   // indexed by robid
   reg [31:0]  trace_insn [0:127];
+  reg [31:0]  trace_imm [0:127];
   reg [127:0] trace_uses_mem;
   reg [3:0]   trace_memop [0:127];
-  reg [31:0]  trace_memaddr [0:127];
+  reg [31:0]  trace_membase [0:127];
   reg [31:0]  trace_memdata [0:127];
 
   // indexed by lsqid
@@ -44,10 +45,12 @@ module top();
 
   task trace_decode(
     input [6:0]  robid,
-    input [31:0] insn);
+    input [31:0] insn,
+    input [31:0] imm);
 
     begin
       trace_insn[robid] = insn;
+      trace_imm[robid] = imm;
       trace_uses_mem[robid] = 0;
     end
   endtask
@@ -55,23 +58,27 @@ module top();
   task trace_lsq_dispatch(
     input [6:0] robid,
     input [4:0] lsqid,
-    input [3:0] op);
+    input [3:0] op,
+    input [31:0] base,
+    input [31:0] wdata);
 
     begin
       trace_robid[lsqid] = robid;
       trace_uses_mem[robid] = 1;
       trace_memop[robid] = op;
+      trace_membase[robid] = base;
+      trace_memdata[robid] = wdata;
     end
   endtask
 
-  task trace_lsq_addrgen(
+  task automatic trace_lsq_base(
     input [4:0]  lsqid,
-    input [31:0] addr);
+    input [31:0] base);
 
     reg [6:0] robid;
     begin
       robid = trace_robid[lsqid];
-      trace_memaddr[robid] = addr;
+      trace_membase[robid] = base;
     end
   endtask
 
@@ -94,7 +101,10 @@ module top();
     input [5:0]  rd,
     input [31:0] result);
 
+    reg [31:0] memaddr;
     begin
+      memaddr = trace_membase[robid] + trace_imm[robid];
+
       $fwrite(tracefd, "core   0: 3 0x%08x (0x%08x)", {addr,2'b0}, trace_insn[robid]);
       if(error)
         $fwrite(tracefd, " error %0d", ecause);
@@ -102,7 +112,7 @@ module top();
         if(~rd[5])
           $fwrite(tracefd, " x%2d 0x%08x", rd[4:0], result);
         if(trace_uses_mem[robid]) begin
-          $fwrite(tracefd, " mem 0x%08x", trace_memaddr[robid]);
+          $fwrite(tracefd, " mem 0x%08x", memaddr);
           if(trace_memop[robid][3])
             case(trace_memop[robid][1:0])
               2'b00: // byte write
@@ -118,7 +128,7 @@ module top();
       $fdisplay(tracefd);
 
       // htif tohost write termination
-      if(~error & trace_uses_mem[robid] & trace_memop[robid][3] & (trace_memaddr[robid] == 32'h30000000))
+      if(~error & trace_uses_mem[robid] & trace_memop[robid][3] & (memaddr == 32'h30000000))
         $finish;
     end
   endtask
