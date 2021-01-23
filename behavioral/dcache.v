@@ -22,17 +22,18 @@ module dcache(
   reg [3:0]  lsqid_s0, lsqid_s1;
   reg [31:0] wdata_s0, rdata_raw, rdata_s1;
   always @(posedge clk)
-    if(rst | lsq_dc_flush) begin
+    if(rst) begin
       req_s0 <= 0;
       req_s1 <= 0;
     end else begin
-      req_s0 <= lsq_dc_req;
+      // preserve incoming writes during a flush
+      req_s0 <= lsq_dc_req & (lsq_dc_op[0] | ~lsq_dc_flush);
       op_s0 <= lsq_dc_op;
       addr_s0 <= lsq_dc_addr;
       lsqid_s0 <= lsq_dc_lsqid;
       wdata_s0 <= lsq_dc_wdata;
 
-      req_s1 <= req_s0 & ~op_s0[0];
+      req_s1 <= req_s0 & ~op_s0[0] & ~lsq_dc_flush;
       lsqid_s1 <= lsqid_s0;
 
       // TODO handle misalignment either in lsq or here
