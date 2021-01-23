@@ -116,7 +116,7 @@ module fetch(
   // pc
   always @(posedge clk)
     if(rst)
-      pc <= 0;
+      pc <= 31'h08000000;
     else if(rob_flush)
       pc <= {rob_flush_pc,1'b0};
     else if(br_taken)

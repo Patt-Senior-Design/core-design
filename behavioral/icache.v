@@ -12,7 +12,7 @@ module icache(
   output        icache_error,
   output [31:0] icache_data);
 
-  reg [31:0] storage [0:16383];
+  reg [31:0] storage [0:16383]; // 64K
 
   localparam STDERR = 32'h80000002;
 
@@ -51,6 +51,6 @@ module icache(
   assign icache_ready = 1;
   assign icache_valid = req_s1;
   assign icache_error = 0;
-  assign icache_data = storage[addr_s1];
+  assign icache_data = storage[addr_s1[15:2]];
 
 endmodule

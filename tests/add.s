@@ -1,4 +1,6 @@
 	.text
+	.global main
+main:
 	li	x1, 1
 	li	x2, 2
 	add	x0, x1, x2
@@ -18,3 +20,6 @@
 	li	x13, 9
 	li	x14, 10
 	add	x12, x13, x14
+
+	mv	a0, zero
+	j	_exit

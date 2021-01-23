@@ -1,8 +1,10 @@
 	.text
+	.global main
+main:
 	li	a0, 128
-	li	a1, 0x10000000
-	li	a2, 0x10010000
-	li	a3, 0x10020000
+	li	a1, 0x20000000
+	li	a2, 0x20010000
+	li	a3, 0x20020000
 
 loop:	lw	t0, 0(a1)
 	addi	a1, a1, 4
@@ -18,4 +20,4 @@ loop:	lw	t0, 0(a1)
 	addi	a0, a0, -1
 	bgtz	a0, loop
 
-done:	j	done
+	j	_exit

@@ -9,16 +9,27 @@ module top();
   always
     #5 clk = ~clk;
 
+  localparam STDERR = 32'h80000002;
+
+  reg [128*8-1:0] tracefile;
+  integer         tracefd;
   initial begin
     $dumpfile("top.vcd");
     $dumpvars;
+
+    tracefd = 0;
+    if($value$plusargs("tracefile=%s", tracefile)) begin
+      tracefd = $fopen(tracefile, "w");
+      if(!tracefd) begin
+        $fdisplay(STDERR, "Cannot open tracefile %0s", tracefile);
+        $finish;
+      end
+    end
 
     clk = 0;
     rst = 1;
     #100;
     rst = 0;
-    #1000;
-    $finish;
   end
 
   // indexed by robid
@@ -84,27 +95,31 @@ module top();
     input [31:0] result);
 
     begin
-      $write("core   0: 3 0x%08x (0x%08x)", {addr,2'b0}, trace_insn[robid]);
+      $fwrite(tracefd, "core   0: 3 0x%08x (0x%08x)", {addr,2'b0}, trace_insn[robid]);
       if(error)
-        $write(" error %0d", ecause);
+        $fwrite(tracefd, " error %0d", ecause);
       else begin
         if(~rd[5])
-          $write(" x%2d 0x%08x", rd[4:0], result);
+          $fwrite(tracefd, " x%2d 0x%08x", rd[4:0], result);
         if(trace_uses_mem[robid]) begin
-          $write(" mem 0x%08x", trace_memaddr[robid]);
+          $fwrite(tracefd, " mem 0x%08x", trace_memaddr[robid]);
           if(trace_memop[robid][3])
             case(trace_memop[robid][1:0])
               2'b00: // byte write
                 // needs to be 01 rather than 02 to match spike
-                $write(" 0x%01x", trace_memdata[robid]);
+                $fwrite(tracefd, " 0x%01x", trace_memdata[robid]);
               2'b01: // halfword write
-                $write(" 0x%04x", trace_memdata[robid]);
+                $fwrite(tracefd, " 0x%04x", trace_memdata[robid]);
               default: // word write
-                $write(" 0x%08x", trace_memdata[robid]);
+                $fwrite(tracefd, " 0x%08x", trace_memdata[robid]);
             endcase
         end
       end
-      $display;
+      $fdisplay(tracefd);
+
+      // htif tohost write termination
+      if(~error & trace_uses_mem[robid] & trace_memop[robid][3] & (trace_memaddr[robid] == 32'h30000000))
+        $finish;
     end
   endtask
 
