@@ -15,6 +15,8 @@ DIFFFILE=$DIR/tests/$TEST.diff
 make -C $DIR/tests || exit $?
 make -C $DIR/behavioral || exit $?
 
+rm -f simtrace spiketrace
+
 mkfifo simtrace
 timeout 5 $DIR/behavioral/build/top +memfile=$HEXFILE +tracefile=simtrace &
 SIMPID=$!
@@ -34,13 +36,13 @@ rm simtrace spiketrace
 wait $SIMPID
 if [ $? -eq 124 ]; then
     echo "iverilog timed out" >> $DIFFFILE
-    exit 1
+    DIFFSTATUS=1
 fi
 
 wait $SPIKEPID
 if [ $? -eq 124 ]; then
     echo "spike timed out" >> $DIFFFILE
-    exit 1
+    DIFFSTATUS=1
 fi
 
 cat $DIFFFILE
