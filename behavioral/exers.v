@@ -137,7 +137,7 @@ module exers #(
 
     // Insertion index: Use issue_idx if issued
     {rs_full, insert_idx} = find_idx(rs_valid, 0);
-    insert_idx = (issue_valid & rs_full ? issue_idx : insert_idx);
+    insert_idx = (issue_valid & (~issue_stall) ? issue_idx : insert_idx);
 
     // Stall combinational
     exers_stall = (rs_full & (~issue_stall));
