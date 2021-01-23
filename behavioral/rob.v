@@ -14,7 +14,7 @@ module rob(
   input         decode_bptaken,
   input [31:2]  decode_target,
   output        rob_full,
-  output [7:0]  rob_robid,
+  output [6:0]  rob_robid,
 
   // wb interface
   input         wb_valid,
@@ -99,7 +99,7 @@ module rob(
 
   // decode interface
   assign rob_full = buf_full;
-  assign rob_robid = {buf_tail_pol,buf_tail};
+  assign rob_robid = buf_tail;
 
   // common signals
   assign rob_flush = ret_exc | ret_mispred;

@@ -26,12 +26,12 @@ module decode(
   output [31:2] decode_target,
   input         rob_flush,
   input         rob_full,
-  input [7:0]   rob_robid,
+  input [6:0]   rob_robid,
 
   // rename interface
   output        decode_rename_valid,
   output [4:0]  decode_rsop,
-  output [7:0]  decode_robid,
+  output [6:0]  decode_robid,
   output        decode_uses_rs1,
   output        decode_uses_rs2,
   output        decode_uses_imm,
@@ -255,7 +255,7 @@ module decode(
   always @(posedge clk)
     if(valid & ~decode_stall)
       top.trace_decode(
-        decode_robid[6:0],
+        decode_robid,
         insn);
 
 endmodule

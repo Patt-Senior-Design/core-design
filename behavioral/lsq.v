@@ -6,7 +6,7 @@ module lsq(
   // rename interface
   input         rename_lsq_write,
   input [3:0]   rename_op,
-  input [7:0]   rename_robid,
+  input [6:0]   rename_robid,
   input [5:0]   rename_rd,
   input         rename_op1ready,
   input [31:0]  rename_op1,
@@ -32,7 +32,7 @@ module lsq(
   output        lsq_wb_valid,
   output        lsq_wb_error,
   output [4:0]  lsq_wb_ecause,
-  output [7:0]  lsq_wb_robid,
+  output [6:0]  lsq_wb_robid,
   output [5:0]  lsq_wb_rd,
   output [31:0] lsq_wb_result,
   input         wb_lsq_stall,
@@ -40,7 +40,7 @@ module lsq(
   // writeback interface (in)
   input         wb_valid,
   input         wb_error,
-  input [7:0]   wb_robid,
+  input [6:0]   wb_robid,
   input [5:0]   wb_rd,
   input [31:0]  wb_result,
 
@@ -274,7 +274,7 @@ module lsq(
         lq_issued[lq_insert_idx] <= 0;
         lq_complete[lq_insert_idx] <= 0;
         lq_type[lq_insert_idx] <= rename_op[2:0];
-        lq_robid[lq_insert_idx] <= rename_robid[6:0];
+        lq_robid[lq_insert_idx] <= rename_robid;
         lq_rd[lq_insert_idx] <= rename_rd[4:0];
         lq_base[lq_insert_idx] <= rename_op1;
         lq_imm[lq_insert_idx] <= rename_imm;
@@ -368,7 +368,7 @@ module lsq(
   always @(posedge clk)
     if(rename_beat)
       top.trace_lsq_dispatch(
-        rename_robid[6:0],
+        rename_robid,
         rename_op[3] ? {1'b1,sq_tail} : {1'b0,lq_insert_idx},
         rename_op);
 

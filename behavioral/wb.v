@@ -8,7 +8,7 @@ module wb(
   input         scalu0_valid,
   input         scalu0_error,
   input [4:0]   scalu0_ecause,
-  input [7:0]   scalu0_robid,
+  input [6:0]   scalu0_robid,
   input [5:0]   scalu0_rd,
   input [31:0]  scalu0_result,
   output reg    wb_scalu0_stall,
@@ -17,7 +17,7 @@ module wb(
   input         scalu1_valid,
   input         scalu1_error,
   input [4:0]   scalu1_ecause,
-  input [7:0]   scalu1_robid,
+  input [6:0]   scalu1_robid,
   input [5:0]   scalu1_rd,
   input [31:0]  scalu1_result,
   output reg    wb_scalu1_stall,
@@ -26,7 +26,7 @@ module wb(
   input         mcalu0_valid,
   input         mcalu0_error,
   input [4:0]   mcalu0_ecause,
-  input [7:0]   mcalu0_robid,
+  input [6:0]   mcalu0_robid,
   input [5:0]   mcalu0_rd,
   input [31:0]  mcalu0_result,
   output reg       wb_mcalu0_stall,
@@ -35,7 +35,7 @@ module wb(
   input         mcalu1_valid,
   input         mcalu1_error,
   input [4:0]   mcalu1_ecause,
-  input [7:0]   mcalu1_robid,
+  input [6:0]   mcalu1_robid,
   input [5:0]   mcalu1_rd,
   input [31:0]  mcalu1_result,
   output reg       wb_mcalu1_stall,
@@ -44,7 +44,7 @@ module wb(
   input         lsq_wb_valid,
   input         lsq_wb_error,
   input [4:0]   lsq_wb_ecause,
-  input [7:0]   lsq_wb_robid,
+  input [6:0]   lsq_wb_robid,
   input [5:0]   lsq_wb_rd,
   input [31:0]  lsq_wb_result,
   output reg       wb_lsq_stall,
@@ -53,7 +53,7 @@ module wb(
   input         csr_valid,
   input         csr_error,
   input [4:0]   csr_ecause,
-  input [7:0]   csr_robid,
+  input [6:0]   csr_robid,
   input [5:0]   csr_rd,
   input [31:0]  csr_result,
 
@@ -61,7 +61,7 @@ module wb(
   output reg       wb_valid,
   output reg       wb_error,
   output reg[4:0]  wb_ecause,
-  output reg[7:0]  wb_robid,
+  output reg[6:0]  wb_robid,
   output reg[5:0]  wb_rd,
   output reg[31:0] wb_result,
 
@@ -71,35 +71,35 @@ module wb(
   reg         scalu0_valid_r;
   reg         scalu0_error_r;
   reg [4:0]   scalu0_ecause_r;
-  reg [7:0]   scalu0_robid_r;
+  reg [6:0]   scalu0_robid_r;
   reg [5:0]   scalu0_rd_r;
   reg [31:0]  scalu0_result_r;
 
   reg         scalu1_valid_r;
   reg         scalu1_error_r;
   reg [4:0]   scalu1_ecause_r;
-  reg [7:0]   scalu1_robid_r;
+  reg [6:0]   scalu1_robid_r;
   reg [5:0]   scalu1_rd_r;
   reg [31:0]  scalu1_result_r;
 
   reg         mcalu0_valid_r;
   reg         mcalu0_error_r;
   reg [4:0]   mcalu0_ecause_r;
-  reg [7:0]   mcalu0_robid_r;
+  reg [6:0]   mcalu0_robid_r;
   reg [5:0]   mcalu0_rd_r;
   reg [31:0]  mcalu0_result_r;
 
   reg         mcalu1_valid_r;
   reg         mcalu1_error_r;
   reg [4:0]   mcalu1_ecause_r;
-  reg [7:0]   mcalu1_robid_r;
+  reg [6:0]   mcalu1_robid_r;
   reg [5:0]   mcalu1_rd_r;
   reg [31:0]  mcalu1_result_r;
 
   reg         lsq_valid_r;
   reg         lsq_error_r;
   reg [4:0]   lsq_ecause_r;
-  reg [7:0]   lsq_robid_r;
+  reg [6:0]   lsq_robid_r;
   reg [5:0]   lsq_rd_r;
   reg [31:0]  lsq_result_r;
 

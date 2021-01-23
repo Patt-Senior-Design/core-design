@@ -7,7 +7,7 @@ module rename(
   input            decode_rename_valid,
   input [31:2]     decode_addr,
   input [4:0]      decode_rsop,
-  input [7:0]      decode_robid,
+  input [6:0]      decode_robid,
   input [5:0]      decode_rd,
   input            decode_uses_rs1,
   input            decode_uses_rs2,
@@ -23,7 +23,7 @@ module rename(
   // rat interface
   output reg       rename_rat_valid, //   
   output reg [5:0] rename_rat_rd, // 
-  output reg [7:0] rename_rat_robid, //
+  output reg [6:0] rename_rat_robid, //
   output reg [4:0] rename_rat_rs1, //
   output reg [4:0] rename_rat_rs2, //
   input            rat_rs1_valid,
@@ -36,7 +36,7 @@ module rename(
   output reg       rename_lsq_write,
   output reg       rename_csr_write,
   output reg [4:0] rename_op, //
-  output reg [7:0] rename_robid, // 
+  output reg [6:0] rename_robid, //
   output reg [5:0] rename_rd, // 
   output reg       rename_op1ready,
   output reg [31:0] rename_op1,
@@ -51,7 +51,7 @@ module rename(
 
   reg valid;
   reg stall;
-  reg [7:0] robid;
+  reg [6:0] robid;
   reg [31:0] addr;
   reg [4:0] op;
   reg [5:0] rd;

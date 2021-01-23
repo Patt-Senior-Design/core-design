@@ -8,7 +8,7 @@ module exers #(
   // rename interface
   input         rename_exers_write,
   input [4:0]   rename_op,
-  input [7:0]   rename_robid,
+  input [6:0]   rename_robid,
   input [5:0]   rename_rd,
   input         rename_op1ready,
   input [31:0]  rename_op1,
@@ -17,7 +17,7 @@ module exers #(
   output reg    exers_stall,
 
   // common scalu/mcalu signals
-  output reg[7:0]  exers_robid,
+  output reg[6:0]  exers_robid,
   output reg[5:0]  exers_rd,
   output reg[31:0] exers_op1,
   output reg[31:0] exers_op2,
@@ -39,7 +39,7 @@ module exers #(
   // wb interface
   input         wb_valid,
   input         wb_error,
-  input [7:0]   wb_robid,
+  input [6:0]   wb_robid,
   input [5:0]   wb_rd,
   input [31:0]  wb_result,
 
@@ -50,7 +50,7 @@ module exers #(
   reg [RS_ENTRIES-1:0] rs_valid;
   reg [4:0]            rs_op[RS_ENTRIES-1:0];
   reg [5:0]            rs_rd[RS_ENTRIES-1:0];
-  reg [7:0]            rs_robid[RS_ENTRIES-1:0];
+  reg [6:0]            rs_robid[RS_ENTRIES-1:0];
 
   reg [RS_ENTRIES-1:0] rs_op1ready;
   reg [31:0]           rs_op1[RS_ENTRIES-1:0];
@@ -98,11 +98,11 @@ module exers #(
     end
     // Dependency resolution: matching tags on valid writeback/uses rd
     for (i = 0; i  < RS_ENTRIES; i = i + 1) begin
-      if (resolve_valid & (~rs_op1ready[i]) & (rs_op1[i][7:0] == wb_robid)) begin
+      if (resolve_valid & (~rs_op1ready[i]) & (rs_op1[i][6:0] == wb_robid)) begin
         rs_op1ready[i] <= 1'b1;
         rs_op1[i] <= wb_result;
       end
-      if (resolve_valid & (~rs_op2ready[i]) & (rs_op2[i][7:0] == wb_robid)) begin
+      if (resolve_valid & (~rs_op2ready[i]) & (rs_op2[i][6:0] == wb_robid)) begin
         rs_op2ready[i] <= 1'b1;
         rs_op2[i] <= wb_result;
       end

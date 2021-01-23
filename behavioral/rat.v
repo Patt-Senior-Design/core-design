@@ -6,7 +6,7 @@ module rat(
   // rename interface
   input         rename_rat_valid,
   input [5:0]   rename_rat_rd,
-  input [7:0]   rename_rat_robid,
+  input [6:0]   rename_rat_robid,
   input [4:0]   rename_rat_rs1,
   input [4:0]   rename_rat_rs2,
   output reg       rat_rs1_valid,
@@ -17,7 +17,7 @@ module rat(
   // wb interface
   input         wb_valid,
   input         wb_error,
-  input [7:0]   wb_robid,
+  input [6:0]   wb_robid,
   input [5:0]   wb_rd,
   input [31:0]  wb_result,
 
@@ -85,7 +85,7 @@ module rat(
     .rd_data2(tag_rs2),
     .wr_en(ld_tag),
     .wr_addr(rename_rat_rd[4:0]),
-    .wr_data(rename_rat_robid[6:0]));
+    .wr_data(rename_rat_robid));
   
   sram_rat #(.DATAW(32)) rat_spec_val (
     .clk(clk),
@@ -118,7 +118,7 @@ module rat(
     if (rob_ret_valid)
       rat_comm_val[rob_ret_rd] <= rob_ret_result;
     if (ld_tag)
-      rat_tag[rename_rat_rd[4:0]] <= rename_rat_robid[6:0];
+      rat_tag[rename_rat_rd[4:0]] <= rename_rat_robid;
     if (ld_spec_val)
       rat_spec_val[wb_prev_rd[4:0]] <= wb_prev_result;
   end
@@ -150,7 +150,7 @@ module rat(
   // Save CDB values
   always @(posedge clk) begin
     wb_prev_write <= wb_write;
-    wb_prev_robid <= wb_robid[6:0];
+    wb_prev_robid <= wb_robid;
     wb_prev_result <= wb_result;
     wb_prev_rd <= wb_rd[4:0];
     // Reset/flush logic (highest priority)
@@ -165,8 +165,8 @@ module rat(
     // Forward value: Prev and Cur CDB val
     forward_prev_rs1 = wb_prev_write & (wb_prev_robid == tag_rs1);
     forward_prev_rs2 = wb_prev_write & (wb_prev_robid == tag_rs2);
-    forward_cur_rs1 = wb_write & (wb_robid[6:0] == tag_rs1);
-    forward_cur_rs2 = wb_write & (wb_robid[6:0] == tag_rs2);
+    forward_cur_rs1 = wb_write & (wb_robid == tag_rs1);
+    forward_cur_rs2 = wb_write & (wb_robid == tag_rs2);
     rat_rs1_valid = forward_cur_rs1 | forward_prev_rs1 | valid_rs1;
     rat_rs2_valid = forward_cur_rs2 | forward_prev_rs2 | valid_rs2;
     casez({committed_rs1, valid_rs1})
