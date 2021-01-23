@@ -275,7 +275,7 @@ module decode(
         rsop = {2'b11,funct3};
       insn_jalr:
         rsop = 5'b10000;
-      fmt_j, insn_auipc:
+      fmt_j, fmt_u:
         rsop = 5'b00000;
       fmt_b:
         rsop = {2'b01,brop};
