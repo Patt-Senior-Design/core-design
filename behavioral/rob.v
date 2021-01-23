@@ -12,6 +12,8 @@ module rob(
   input [5:0]   decode_rd,
   input [15:0]  decode_bptag,
   input         decode_bptaken,
+  input         decode_forward,
+  input         decode_inhibit,
   input [31:2]  decode_target,
   output        rob_full,
   output [6:0]  rob_robid,
@@ -59,6 +61,7 @@ module rob(
   reg [31:2]  buf_target [0:127];
   reg [15:0]  buf_bptag [0:127];
   reg [127:0] buf_bptaken;
+  reg [127:0] buf_forwarded;
 
   // insert at tail, remove at head
   reg [6:0]   buf_head, buf_tail;
@@ -74,6 +77,9 @@ module rob(
   reg [31:2]  ret_target;
   reg [15:0]  ret_bptag;
   reg         ret_bptaken;
+  reg         ret_forwarded;
+
+  reg         decode_inhibit_r;
 
   wire [7:0] buf_head_next;
   wire [6:0] ret_rd_addr;
@@ -105,12 +111,12 @@ module rob(
   assign rob_flush = ret_exc | ret_mispred;
 
   // fetch interface
-  assign rob_flush_pc = ret_error ? csr_tvec : ret_target;
+  assign rob_flush_pc = ret_error ? csr_tvec : (ret_forwarded ? ret_result[31:2] : ret_target);
 
   // rat interface
   assign rob_ret_valid = ret_valid & ~ret_error & ~ret_rd[5];
   assign rob_ret_rd = ret_rd[4:0];
-  assign rob_ret_result = ret_result;
+  assign rob_ret_result = ret_forwarded ? {ret_target,2'b0} : ret_result;
 
   // brpred interface
   assign rob_ret_branch = ret_valid & ret_retop[6];
@@ -142,6 +148,13 @@ module rob(
     end else if(decode_beat)
       {buf_tail_pol,buf_tail} <= {buf_tail_pol,buf_tail} + 1;
 
+  // decode_inhibit_r
+  always @(posedge clk)
+    if(rst | rob_flush)
+      decode_inhibit_r <= 0;
+    else
+      decode_inhibit_r <= decode_beat & decode_inhibit;
+
   // buf read
   always @(posedge clk)
     if(rst | rob_flush)
@@ -157,6 +170,7 @@ module rob(
       ret_target <= buf_target[ret_rd_addr];
       ret_bptag <= buf_bptag[ret_rd_addr];
       ret_bptaken <= buf_bptaken[ret_rd_addr];
+      ret_forwarded <= buf_forwarded[ret_rd_addr];
     end
 
   // buf write
@@ -171,9 +185,10 @@ module rob(
       buf_target[buf_tail] <= decode_target;
       buf_bptag[buf_tail] <= decode_bptag;
       buf_bptaken[buf_tail] <= decode_bptaken;
+      buf_forwarded[buf_tail] <= decode_forward;
     end
 
-    if(wb_valid) begin
+    if(wb_valid & ~decode_inhibit_r) begin
       buf_executed[wb_robid] <= 1;
       buf_error[wb_robid] <= wb_error;
       buf_ecause[wb_robid] <= wb_ecause;
@@ -189,6 +204,6 @@ module rob(
         ret_error,
         ret_ecause,
         ret_rd,
-        ret_result);
+        rob_ret_result);
 
 endmodule

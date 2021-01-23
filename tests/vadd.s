@@ -20,4 +20,4 @@ loop:	lw	t0, 0(a1)
 	addi	a0, a0, -1
 	bgtz	a0, loop
 
-	j	_exit
+	ret

@@ -12,10 +12,6 @@ module decode(
   input         fetch_de_bptaken,
   output        decode_stall,
 
-  // common rob/rename signals
-  output [31:2] decode_addr,
-  output [5:0]  decode_rd,
-
   // rob interface
   output        decode_rob_valid,
   output        decode_error,
@@ -23,15 +19,24 @@ module decode(
   output [6:0]  decode_retop,
   output [15:0] decode_bptag,
   output        decode_bptaken,
-  output [31:2] decode_target,
+  output        decode_inhibit,
   input         rob_flush,
   input         rob_full,
   input [6:0]   rob_robid,
 
+  // common rob/rename signals
+  output [31:2] decode_addr,
+
+  // common rob/rename/wb signals
+  output [5:0]  decode_rd,
+
+  // common rob/wb signals
+  output        decode_forward,
+  output [31:2] decode_target,
+
   // rename interface
   output        decode_rename_valid,
   output [4:0]  decode_rsop,
-  output [6:0]  decode_robid,
   output        decode_uses_rs1,
   output        decode_uses_rs2,
   output        decode_uses_imm,
@@ -41,7 +46,13 @@ module decode(
   output [4:0]  decode_rs1,
   output [4:0]  decode_rs2,
   output [31:0] decode_imm,
-  input         rename_stall);
+  input         rename_stall,
+
+  // common rename/wb signals
+  output [6:0]  decode_robid,
+
+  // wb interface
+  output        decode_wb_valid);
 
   reg        valid;
   reg        error;
@@ -115,12 +126,12 @@ module decode(
   assign rd = insn[11:7];
 
   wire uses_rd, uses_rs1, uses_rs2;
-  assign uses_rd = (fmt_r | fmt_i | fmt_u | fmt_j) & (rd != 0);
+  assign uses_rd = (fmt_r | fmt_i | fmt_u | fmt_j) & (rd != 0) & ~decode_forward;
   assign uses_rs1 = fmt_r | (fmt_i & (~insn_csr | ~funct3[2])) | fmt_s | fmt_b;
   assign uses_rs2 = fmt_r | fmt_s | fmt_b;
 
   wire target_ntaken;
-  assign target_ntaken = fmt_b & bptaken;
+  assign target_ntaken = (fmt_b & bptaken) | insn_jalr;
 
   // TODO misaligned target?
   wire [31:1] target;
@@ -129,10 +140,6 @@ module decode(
   // fetch interface
   assign decode_stall = rob_full | rename_stall;
 
-  // common rob/rename signals
-  assign decode_addr = addr[31:2];
-  assign decode_rd = {~uses_rd,insn[11:7]};
-
   // rob interface
   assign decode_rob_valid = valid & ~rename_stall;
   assign decode_error = error | fmt_inv;
@@ -140,21 +147,36 @@ module decode(
   assign decode_retop = {fmt_b,funct3[0],insn_jalr,fmt_s,funct3};
   assign decode_bptag = bptag;
   assign decode_bptaken = bptaken;
+  assign decode_inhibit = insn_jalr;
+
+  // common rob/rename signals
+  assign decode_forward = insn_jalr;
+  assign decode_addr = addr[31:2];
+
+  // common rob/rename/wb signals
+  assign decode_rd = {~uses_rd,insn[11:7]};
+
+  // common rob/wb signals
   assign decode_target = target[31:2];
 
   // rename interface
   assign decode_rename_valid = valid & ~decode_error & ~rob_full;
   assign decode_rsop = rsop;
-  assign decode_robid = rob_robid;
   assign decode_uses_rs1 = uses_rs1;
   assign decode_uses_rs2 = uses_rs2;
   assign decode_uses_imm = ~fmt_r & ~fmt_b;
   assign decode_uses_memory = insn_load | fmt_s;
-  assign decode_uses_pc = fmt_j | insn_jalr | insn_auipc;
+  assign decode_uses_pc = fmt_j | insn_auipc;
   assign decode_csr_access = insn_csr;
   assign decode_rs1 = rs1;
   assign decode_rs2 = rs2;
-  assign decode_imm = imm;
+  assign decode_imm = fmt_j ? 4 : imm;
+
+  // common rename/wb signals
+  assign decode_robid = rob_robid;
+
+  // wb interface
+  assign decode_wb_valid = valid & ~decode_error & decode_forward & ~decode_stall;
 
   always @(posedge clk)
     if(rst | rob_flush)
@@ -249,6 +271,8 @@ module decode(
         rsop = {2'b11,funct3};
       insn_jalr:
         rsop = 5'b10000;
+      fmt_j, insn_auipc:
+        rsop = 5'b00000;
       fmt_b:
         rsop = {2'b01,brop};
       default: // SRLI alternation: special case

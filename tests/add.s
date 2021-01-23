@@ -1,6 +1,8 @@
 	.text
 	.global main
 main:
+	mv	x31, ra
+
 	li	x1, 1
 	li	x2, 2
 	add	x0, x1, x2
@@ -22,4 +24,5 @@ main:
 	add	x12, x13, x14
 
 	mv	a0, zero
-	j	_exit
+	mv	ra, x31
+	ret

@@ -15,6 +15,7 @@ module rename(
   input            decode_uses_memory,
   input            decode_uses_pc,
   input            decode_csr_access,
+  input            decode_forward,
   input [4:0]      decode_rs1,
   input [4:0]      decode_rs2,
   input [31:0]     decode_imm,
@@ -150,7 +151,7 @@ module rename(
     // rat combinational
     rename_rat_valid = decode_rename_valid;
     rename_rat_robid = decode_robid;
-    rename_rat_rd = decode_rd;
+    rename_rat_rd = decode_rd & ~{decode_forward,5'b0}; // force uses_rd if forwarding
     rename_rat_rs1 = decode_rs1;
     rename_rat_rs2 = decode_rs2;
   end

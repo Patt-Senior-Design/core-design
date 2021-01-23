@@ -35,9 +35,8 @@ bss_cleared:
 	# launch program
 	la	sp, _stack-4
 	sw	zero, 0(sp)
-	j	main
+	call	main
 
-_exit:
 	# halt
 	sll	t0, a0, 1 # return value of main << 1
 	ori	t0, t0, 1 # set the low bit (signals to HTIF to exit)

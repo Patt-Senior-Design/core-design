@@ -4,6 +4,12 @@ module wb(
   input         clk,
   input         rst,
 
+  // decode interface (highest priority)
+  input         decode_wb_valid,
+  input [6:0]   decode_robid,
+  input [5:0]   decode_rd,
+  input [31:2]  decode_target,
+
   // scalu0 interface
   input         scalu0_valid,
   input         scalu0_error,
@@ -68,6 +74,11 @@ module wb(
   // rob interface
   input         rob_flush);
 
+  reg         decode_valid_r;
+  reg [6:0]   decode_robid_r;
+  reg [4:0]   decode_rd_r;
+  reg [31:0]  decode_result_r;
+
   reg         scalu0_valid_r;
   reg         scalu0_error_r;
   reg [4:0]   scalu0_ecause_r;
@@ -103,11 +114,9 @@ module wb(
   reg [5:0]   lsq_rd_r;
   reg [31:0]  lsq_result_r;
 
-  reg [4:0] fu_valid;
-  reg [4:0] fu_arbitrated;
-
   always @(posedge clk) begin
     if (rst | rob_flush) begin
+      decode_valid_r <= 1'b0;
       scalu0_valid_r <= 1'b0;
       scalu1_valid_r <= 1'b0;
       mcalu0_valid_r <= 1'b0;
@@ -115,6 +124,11 @@ module wb(
       lsq_valid_r <= 1'b0;
     end
     else begin
+      decode_valid_r <= decode_wb_valid;
+      decode_robid_r <= decode_robid;
+      decode_rd_r <= decode_rd[4:0];
+      decode_result_r <= {decode_target,2'b0};
+
       // CSR uses scalu0
       if(~wb_scalu0_stall) begin
         scalu0_valid_r <= csr_valid | scalu0_valid;
@@ -164,56 +178,55 @@ module wb(
   end
 
   always @(*) begin
-    fu_valid = {lsq_valid_r, mcalu1_valid_r, mcalu0_valid_r, scalu1_valid_r, scalu0_valid_r};
-    wb_valid = (| fu_valid);
-    casez(fu_valid)
-      5'b1????: begin
-                  fu_arbitrated = 5'b10000;
-                  wb_error = lsq_error_r;
-                  wb_ecause = lsq_ecause_r; 
-                  wb_robid = lsq_robid_r;
-                  wb_rd = lsq_rd_r;
-                  wb_result = lsq_result_r;
-                end
-      5'b01???: begin 
-                  fu_arbitrated = 5'b01000;
-                  wb_error = mcalu1_error_r;
-                  wb_ecause = mcalu1_ecause_r; 
-                  wb_robid = mcalu1_robid_r;
-                  wb_rd = mcalu1_rd_r;
-                  wb_result = mcalu1_result_r;
-                end
-      5'b001??: begin 
-                  fu_arbitrated = 5'b00100;
-                  wb_error = mcalu0_error_r;
-                  wb_ecause = mcalu0_ecause_r; 
-                  wb_robid = mcalu0_robid_r;
-                  wb_rd = mcalu0_rd_r;
-                  wb_result = mcalu0_result_r;
-                end
-      5'b0001?: begin 
-                  fu_arbitrated = 5'b00010;
-                  wb_error = scalu1_error_r;
-                  wb_ecause = scalu1_ecause_r; 
-                  wb_robid = scalu1_robid_r;
-                  wb_rd = scalu1_rd_r;
-                  wb_result = scalu1_result_r;
-                end
-      5'b00001: begin 
-                  fu_arbitrated = 5'b00001;
-                  wb_error = scalu0_error_r;
-                  wb_ecause = scalu0_ecause_r; 
-                  wb_robid = scalu0_robid_r;
-                  wb_rd = scalu0_rd_r;
-                  wb_result = scalu0_result_r;
-                end
-      default:  begin
-                  wb_valid = 1'b0;
-                  fu_arbitrated = 5'b00000;
-                end
-    endcase
-    {wb_lsq_stall, wb_mcalu1_stall, wb_mcalu0_stall, 
-      wb_scalu1_stall, wb_scalu0_stall} = (fu_valid & (~fu_arbitrated));
+    wb_valid = 1;
+    wb_scalu0_stall = scalu0_valid_r;
+    wb_scalu1_stall = scalu1_valid_r;
+    wb_mcalu0_stall = mcalu0_valid_r;
+    wb_mcalu1_stall = mcalu1_valid_r;
+    wb_lsq_stall    = lsq_valid_r;
+    if(decode_valid_r) begin
+      wb_error  = 0;
+      wb_ecause = 0;
+      wb_robid  = decode_robid_r;
+      wb_rd     = {1'b0,decode_rd_r};
+      wb_result = decode_result_r;
+    end else if(lsq_valid_r) begin
+      wb_lsq_stall = 0;
+      wb_error  = lsq_error_r;
+      wb_ecause = lsq_ecause_r;
+      wb_robid  = lsq_robid_r;
+      wb_rd     = lsq_rd_r;
+      wb_result = lsq_result_r;
+    end else if(mcalu0_valid_r) begin
+      wb_mcalu0_stall = 0;
+      wb_error  = mcalu0_error_r;
+      wb_ecause = mcalu0_ecause_r;
+      wb_robid  = mcalu0_robid_r;
+      wb_rd     = mcalu0_rd_r;
+      wb_result = mcalu0_result_r;
+    end else if(mcalu1_valid_r) begin
+      wb_mcalu1_stall = 0;
+      wb_error  = mcalu1_error_r;
+      wb_ecause = mcalu1_ecause_r;
+      wb_robid  = mcalu1_robid_r;
+      wb_rd     = mcalu1_rd_r;
+      wb_result = mcalu1_result_r;
+    end else if(scalu0_valid_r) begin
+      wb_scalu0_stall = 0;
+      wb_error  = scalu0_error_r;
+      wb_ecause = scalu0_ecause_r;
+      wb_robid  = scalu0_robid_r;
+      wb_rd     = scalu0_rd_r;
+      wb_result = scalu0_result_r;
+    end else if(scalu1_valid_r) begin
+      wb_scalu1_stall = 0;
+      wb_error  = scalu1_error_r;
+      wb_ecause = scalu1_ecause_r;
+      wb_robid  = scalu1_robid_r;
+      wb_rd     = scalu1_rd_r;
+      wb_result = scalu1_result_r;
+    end else
+      wb_valid = 0;
   end
 
 endmodule

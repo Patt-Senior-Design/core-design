@@ -7,7 +7,7 @@ main:
 
 error:
 	li	a0, 1		# 1
-	j	_exit		# 2
+	ret			# 2
 
 start:	addi	s1, s1, 10	# 3
 	blt	s0, s1, label1	# 4
@@ -22,6 +22,6 @@ label1:	addi	s0, s0, 20	# 9
 	beq	x0, x0, error	# 11
 
 end:	mv	a0, zero	# 12
-	j	_exit
+	ret
 
 	# 0, 3, 4, 9, 10, 6, 7, 12
