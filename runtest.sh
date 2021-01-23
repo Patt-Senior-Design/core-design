@@ -20,7 +20,7 @@ timeout 5 $DIR/behavioral/build/top +memfile=$HEXFILE +tracefile=simtrace &
 SIMPID=$!
 
 mkfifo spiketrace
-timeout 5 spike --log-commits --isa=RV32I \
+timeout 5 spike --log-commits --isa=RV32IM \
         -m0x10000000:0x10000,0x20000000:0x400000,0x30000000:0x1000 \
         $ELFFILE 2> spiketrace &
 SPIKEPID=$!

@@ -1,14 +1,16 @@
 TARGET := riscv64-unknown-elf
 AS := $(TARGET)-as
-LD := $(TARGET)-ld
+CC := $(TARGET)-gcc
 OBJCOPY := $(TARGET)-objcopy
 OBJDUMP := $(TARGET)-objdump
 
 ASFLAGS := -march=rv32im -mabi=ilp32
-LDFLAGS := -b elf32-littleriscv --gc-sections
+CFLAGS := -march=rv32im -mabi=ilp32 -Wall -O2 -ffunction-sections -fdata-sections
+LFLAGS := -march=rv32im -mabi=ilp32 -nostartfiles -Wl,--gc-sections
 
 SRCS_S := $(filter-out startup.s, $(wildcard *.s))
-OUTS_ELF := $(SRCS_S:.s=.elf)
+SRCS_C := $(filter-out stdlib.c, $(wildcard *.c))
+OUTS_ELF := $(SRCS_S:.s=.elf) $(SRCS_C:.c=.elf)
 OUTS_HEX := $(OUTS_ELF:.elf=.hex)
 OUTS_DIS := $(OUTS_ELF:.elf=.dis)
 
@@ -16,8 +18,8 @@ OUTS_DIS := $(OUTS_ELF:.elf=.dis)
 
 all: $(OUTS_ELF) $(OUTS_HEX) $(OUTS_DIS)
 
-%.elf: %.o startup.o link.ld
-	$(LD) $(LDFLAGS) -Tlink.ld -o $*.elf startup.o $*.o
+%.elf: %.o startup.o stdlib.o link.ld
+	$(CC) $(LFLAGS) -Tlink.ld -o $*.elf startup.o $< stdlib.o
 
 %.bin: %.elf
 	$(OBJCOPY) -O binary $< $@
