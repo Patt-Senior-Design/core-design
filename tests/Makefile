@@ -1,4 +1,4 @@
-TARGET := riscv64-unknown-elf
+TARGET := $(shell ../scripts/detect-riscv-prefix.sh)
 AS := $(TARGET)-as
 CC := $(TARGET)-gcc
 OBJCOPY := $(TARGET)-objcopy
