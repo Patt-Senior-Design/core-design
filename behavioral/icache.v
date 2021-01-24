@@ -16,7 +16,7 @@ module icache(
 
   reg        req_s0, req_s1;
   reg [31:2] addr_s0;
-  reg [31:0] rdata_s1;
+  reg [31:0] rdata_raw, rdata_s1;
   always @(posedge clk)
     if(rst | fetch_ic_flush) begin
       req_s0 <= 0;
@@ -26,8 +26,10 @@ module icache(
       addr_s0 <= fetch_ic_addr;
 
       req_s1 <= req_s0;
-      if(req_s0)
-        top.mem_read(addr_s0, rdata_s1);
+      if(req_s0) begin
+        top.mem_read(addr_s0, rdata_raw);
+        rdata_s1 <= rdata_raw;
+      end
     end
 
   assign icache_ready = 1;
