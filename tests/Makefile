@@ -10,13 +10,14 @@ LFLAGS := -march=rv32im -mabi=ilp32 -nostartfiles -Wl,--gc-sections
 
 SRCS_S := $(filter-out startup.s, $(wildcard *.s))
 SRCS_C := $(filter-out stdlib.c, $(wildcard *.c))
-OUTS_ELF := $(SRCS_S:.s=.elf) $(SRCS_C:.c=.elf)
-OUTS_HEX := $(OUTS_ELF:.elf=.hex)
-OUTS_DIS := $(OUTS_ELF:.elf=.dis)
+OUTS_O := $(SRCS_S:.s=.o) $(SRCS_C:.c=.o)
+OUTS_ELF := $(OUTS_O:.o=.elf)
+OUTS_HEX := $(OUTS_O:.o=.hex)
+OUTS_DIS := $(OUTS_O:.o=.dis)
 
 .PHONY: all clean
 
-all: $(OUTS_ELF) $(OUTS_HEX) $(OUTS_DIS)
+all: $(OUTS_O) $(OUTS_ELF) $(OUTS_HEX) $(OUTS_DIS) startup.o stdlib.o
 
 %.elf: %.o startup.o stdlib.o link.ld
 	$(CC) $(LFLAGS) -Tlink.ld -o $*.elf startup.o $< stdlib.o
@@ -34,4 +35,4 @@ all: $(OUTS_ELF) $(OUTS_HEX) $(OUTS_DIS)
 	$(OBJDUMP) -d -Mnumeric -Mno-aliases $< > $@
 
 clean:
-	@rm -f *.elf *.hex *.xxd *.o *.bin *.diff
+	@rm -f *.elf *.hex *.xxd *.o *.bin *.diff *.dis *.log

@@ -46,7 +46,7 @@ module top();
         fd = $fopen(argfile, mode);
         if(!fd) begin
           $fdisplay(STDERR, "Cannot open file %0s", argfile);
-          $finish;
+          #1 $finish;
         end
       end
     end
@@ -67,7 +67,7 @@ module top();
       memfd = $fopen(memfile, "r");
       if(!memfd) begin
         $fdisplay(STDERR, "Cannot open memfile %0s", memfile);
-        $finish;
+        #1 $finish;
       end
       $fclose(memfd);
 

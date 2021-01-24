@@ -6,7 +6,7 @@ for TEST in $TESTS; do
     if [ $TEST = startup -o $TEST = stdlib ]; then continue; fi
 
     printf "%-16s" $TEST
-    ./runtest.sh $TEST > /dev/null 2>&1
+    $DIR/runtest.sh $TEST > /dev/null 2>&1
     if [ $? -eq 0 ]; then
         echo "passed"
     else
