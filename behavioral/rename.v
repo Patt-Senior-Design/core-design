@@ -62,6 +62,8 @@ module rename(
   reg uses_memory;
   reg uses_pc;
   reg csr_access;
+  reg [4:0] rs1;
+  reg [4:0] rs2;
   reg [31:0] imm;
 
   
@@ -78,6 +80,8 @@ module rename(
       uses_memory <= decode_uses_memory;
       uses_pc <= decode_uses_pc;
       csr_access <= decode_csr_access;
+      rs1 <= decode_rs1;
+      rs2 <= decode_rs2;
       imm <= decode_imm;
     end
     
@@ -145,15 +149,22 @@ module rename(
     rename_imm = imm;
     
     // stall combinational
-    rename_stall = (exers_stall & (~decode_uses_memory) & (~decode_csr_access)) | 
-                        (lsq_stall & decode_uses_memory) &
-                        !rst;
+    rename_stall = (rename_exers_write & exers_stall) | (rename_lsq_write & lsq_stall);
+
     // rat combinational
-    rename_rat_valid = decode_rename_valid;
     rename_rat_robid = decode_robid;
-    rename_rat_rd = decode_rd & ~{decode_forward,5'b0}; // force uses_rd if forwarding
-    rename_rat_rs1 = decode_rs1;
-    rename_rat_rs2 = decode_rs2;
+    if(rename_stall) begin
+      // read the rat while stalling to ensure we have the latest value
+      rename_rat_valid = 1;
+      rename_rat_rd = 6'b100000;
+      rename_rat_rs1 = rs1;
+      rename_rat_rs2 = rs2;
+    end else begin
+      rename_rat_valid = decode_rename_valid & ~rename_stall;
+      rename_rat_rd = decode_rd & ~{decode_forward,5'b0}; // force uses_rd if forwarding
+      rename_rat_rs1 = decode_rs1;
+      rename_rat_rs2 = decode_rs2;
+    end
   end
   
 
