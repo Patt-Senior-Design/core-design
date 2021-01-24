@@ -119,7 +119,11 @@ module decode(
 
   wire [2:0] brop;
   assign brop = {~|funct3[2:1],funct3[2:1]};
-  
+
+  // SRLI alternation: special case
+  wire altop;
+  assign altop = (fmt_r | (funct3 == 3'b101)) & insn[30];
+
   wire [4:0] rs1, rs2, rd;
   assign rs1 = insn[19:15];
   assign rs2 = insn[24:20];
@@ -271,12 +275,12 @@ module decode(
         rsop = {2'b11,funct3};
       insn_jalr:
         rsop = 5'b10000;
-      fmt_j, insn_auipc:
+      fmt_j, fmt_u:
         rsop = 5'b00000;
       fmt_b:
         rsop = {2'b01,brop};
-      default: // SRLI alternation: special case
-        rsop = {1'b0, ((fmt_r | (funct3 == 3'b101)) & insn[30]),funct3};
+      default:
+        rsop = {1'b0,altop,funct3};
     endcase
 
   always @(posedge clk)

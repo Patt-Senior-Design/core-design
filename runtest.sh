@@ -10,6 +10,7 @@ TEST=$1
 
 HEXFILE=$DIR/tests/$TEST.hex
 ELFFILE=$DIR/tests/$TEST.elf
+LOGFILE=$DIR/tests/$TEST.log
 DIFFFILE=$DIR/tests/$TEST.diff
 
 make -C $DIR/tests || exit $?
@@ -18,7 +19,7 @@ make -C $DIR/behavioral || exit $?
 rm -f simtrace spiketrace
 
 mkfifo simtrace
-timeout 5 $DIR/behavioral/build/top +memfile=$HEXFILE +tracefile=simtrace &
+timeout 5 $DIR/behavioral/build/top +memfile=$HEXFILE +tracefile=simtrace +logfile=$LOGFILE &
 SIMPID=$!
 
 mkfifo spiketrace

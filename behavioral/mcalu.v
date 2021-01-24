@@ -75,7 +75,7 @@ module mcalu(
         3'b010: mcalu_result = ($signed(op1) < $signed(op2)); // SLT
         3'b011: mcalu_result = (op1 < op2); // SLTU
         3'b100: mcalu_result = (op[3] ? (op1 == op2) : (op1 ^ op2)); // XOR, SEQ
-        3'b101: mcalu_result = (op[3] ? (op1 >> op2[4:0]) : ($signed(op1) >>> op2[4:0])); // SRL, SRA
+        3'b101: mcalu_result = (op[3] ? $signed($signed(op1) >>> op2[4:0]) : (op1 >> op2[4:0])); // SRL, SRA
         3'b110: mcalu_result = (op1 | op2);
         3'b111: mcalu_result = (op1 & op2);
         default: mcalu_result = 32'bx;
