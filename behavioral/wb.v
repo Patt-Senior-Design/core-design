@@ -4,11 +4,11 @@ module wb(
   input         clk,
   input         rst,
 
-  // decode interface (highest priority)
-  input         decode_wb_valid,
-  input [6:0]   decode_robid,
-  input [5:0]   decode_rd,
-  input [31:2]  decode_target,
+  // rename interface (highest priority)
+  input         rename_wb_valid,
+  input [6:0]   rename_robid,
+  input [5:0]   rename_rd,
+  input [31:2]  rename_wb_result,
 
   // scalu0 interface
   input         scalu0_valid,
@@ -74,10 +74,10 @@ module wb(
   // rob interface
   input         rob_flush);
 
-  reg         decode_valid_r;
-  reg [6:0]   decode_robid_r;
-  reg [4:0]   decode_rd_r;
-  reg [31:0]  decode_result_r;
+  reg         rename_valid_r;
+  reg [6:0]   rename_robid_r;
+  reg [4:0]   rename_rd_r;
+  reg [31:0]  rename_result_r;
 
   reg         scalu0_valid_r;
   reg         scalu0_error_r;
@@ -116,7 +116,7 @@ module wb(
 
   always @(posedge clk) begin
     if (rst | rob_flush) begin
-      decode_valid_r <= 1'b0;
+      rename_valid_r <= 1'b0;
       scalu0_valid_r <= 1'b0;
       scalu1_valid_r <= 1'b0;
       mcalu0_valid_r <= 1'b0;
@@ -124,10 +124,10 @@ module wb(
       lsq_valid_r <= 1'b0;
     end
     else begin
-      decode_valid_r <= decode_wb_valid;
-      decode_robid_r <= decode_robid;
-      decode_rd_r <= decode_rd[4:0];
-      decode_result_r <= {decode_target,2'b0};
+      rename_valid_r <= rename_wb_valid;
+      rename_robid_r <= rename_robid;
+      rename_rd_r <= rename_rd[4:0];
+      rename_result_r <= {rename_wb_result,2'b0};
 
       // CSR uses scalu0
       if(~wb_scalu0_stall) begin
@@ -184,12 +184,12 @@ module wb(
     wb_mcalu0_stall = mcalu0_valid_r;
     wb_mcalu1_stall = mcalu1_valid_r;
     wb_lsq_stall    = lsq_valid_r;
-    if(decode_valid_r) begin
+    if(rename_valid_r) begin
       wb_error  = 0;
       wb_ecause = 0;
-      wb_robid  = decode_robid_r;
-      wb_rd     = {1'b0,decode_rd_r};
-      wb_result = decode_result_r;
+      wb_robid  = rename_robid_r;
+      wb_rd     = {1'b0,rename_rd_r};
+      wb_result = rename_result_r;
     end else if(lsq_valid_r) begin
       wb_lsq_stall = 0;
       wb_error  = lsq_error_r;

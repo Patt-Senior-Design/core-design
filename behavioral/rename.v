@@ -16,29 +16,31 @@ module rename(
   input            decode_uses_pc,
   input            decode_csr_access,
   input            decode_forward,
+  input            decode_inhibit,
+  input [31:2]     decode_target,
   input [4:0]      decode_rs1,
   input [4:0]      decode_rs2,
   input [31:0]     decode_imm,
   output reg       rename_stall, // 
 
   // rat interface
-  output reg       rename_rat_valid, //   
-  output reg [5:0] rename_rat_rd, // 
-  output reg [6:0] rename_rat_robid, //
-  output reg [4:0] rename_rat_rs1, //
-  output reg [4:0] rename_rat_rs2, //
+  output reg [4:0] rename_rs1,
+  output reg [4:0] rename_rs2,
+  output reg       rename_alloc,
   input            rat_rs1_valid,
   input [31:0]     rat_rs1_tagval,
   input            rat_rs2_valid,
   input [31:0]     rat_rs2_tagval,
+
+  // common rat/dispatch/wb signals
+  output reg [5:0]  rename_rd,
+  output reg [6:0]  rename_robid,
 
   // exers/lsq/csr interface
   output reg       rename_exers_write,
   output reg       rename_lsq_write,
   output reg       rename_csr_write,
   output reg [4:0] rename_op, //
-  output reg [6:0] rename_robid, //
-  output reg [5:0] rename_rd, // 
   output reg       rename_op1ready,
   output reg [31:0] rename_op1,
   output reg       rename_op2ready,
@@ -47,8 +49,13 @@ module rename(
   input            exers_stall,
   input            lsq_stall,
 
+  // wb interface
+  output reg        rename_wb_valid,
+  output reg [31:2] rename_wb_result,
+
   // rob interface
-  input            rob_flush);
+  input             rob_flush,
+  output reg        rename_inhibit);
 
   reg valid;
   reg stall;
@@ -62,6 +69,9 @@ module rename(
   reg uses_memory;
   reg uses_pc;
   reg csr_access;
+  reg forward;
+  reg inhibit;
+  reg [31:2] result;
   reg [4:0] rs1;
   reg [4:0] rs2;
   reg [31:0] imm;
@@ -80,6 +90,9 @@ module rename(
       uses_memory <= decode_uses_memory;
       uses_pc <= decode_uses_pc;
       csr_access <= decode_csr_access;
+      forward <= decode_forward;
+      inhibit <= decode_inhibit;
+      result <= decode_target;
       rs1 <= decode_rs1;
       rs2 <= decode_rs2;
       imm <= decode_imm;
@@ -99,7 +112,7 @@ module rename(
     rename_exers_write = valid & (~uses_memory) & (~csr_access); 
     rename_op = op;
     rename_robid = robid;
-    rename_rd = rd;
+    rename_rd = rd | {forward,5'b0}; // inhibit uses_rd if forwarding
       
     // OP generation
     case ({uses_rs1, uses_pc})
@@ -151,20 +164,19 @@ module rename(
     // stall combinational
     rename_stall = (rename_exers_write & exers_stall) | (rename_lsq_write & lsq_stall);
 
-    // rat combinational
-    rename_rat_robid = decode_robid;
-    if(rename_stall) begin
-      // read the rat while stalling to ensure we have the latest value
-      rename_rat_valid = 1;
-      rename_rat_rd = 6'b100000;
-      rename_rat_rs1 = rs1;
-      rename_rat_rs2 = rs2;
-    end else begin
-      rename_rat_valid = decode_rename_valid & ~rename_stall;
-      rename_rat_rd = decode_rd & ~{decode_forward,5'b0}; // force uses_rd if forwarding
-      rename_rat_rs1 = decode_rs1;
-      rename_rat_rs2 = decode_rs2;
-    end
+    rename_rs1 = rs1;
+    rename_rs2 = rs2;
+
+    // delay tag allocation until dispatch
+    rename_alloc = valid & ~rename_stall & ~rd[5];
+
+    // if forwarding, send result to wb during tag allocation
+    rename_wb_valid = valid & ~rename_stall & forward;
+    rename_wb_result = result;
+
+    // if both forwarding and dispatching, tell rob to ignore next wb cycle
+    // (the forwarded data was already written to the rob target field in decode)
+    rename_inhibit = valid & ~rename_stall & inhibit;
   end
   
 

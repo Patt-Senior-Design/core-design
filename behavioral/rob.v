@@ -13,10 +13,12 @@ module rob(
   input [15:0]  decode_bptag,
   input         decode_bptaken,
   input         decode_forward,
-  input         decode_inhibit,
   input [31:2]  decode_target,
   output        rob_full,
   output [6:0]  rob_robid,
+
+  // rename interface
+  input         rename_inhibit,
 
   // wb interface
   input         wb_valid,
@@ -79,7 +81,7 @@ module rob(
   reg         ret_bptaken;
   reg         ret_forwarded;
 
-  reg         decode_inhibit_r;
+  reg         rename_inhibit_r;
 
   wire [7:0] buf_head_next;
   wire [6:0] ret_rd_addr;
@@ -148,12 +150,12 @@ module rob(
     end else if(decode_beat)
       {buf_tail_pol,buf_tail} <= {buf_tail_pol,buf_tail} + 1;
 
-  // decode_inhibit_r
+  // rename_inhibit_r
   always @(posedge clk)
     if(rst | rob_flush)
-      decode_inhibit_r <= 0;
+      rename_inhibit_r <= 0;
     else
-      decode_inhibit_r <= decode_beat & decode_inhibit;
+      rename_inhibit_r <= rename_inhibit;
 
   // buf read
   always @(posedge clk)
@@ -188,7 +190,7 @@ module rob(
       buf_forwarded[buf_tail] <= decode_forward;
     end
 
-    if(wb_valid & ~decode_inhibit_r) begin
+    if(wb_valid & ~rename_inhibit_r) begin
       buf_executed[wb_robid] <= 1;
       buf_error[wb_robid] <= wb_error;
       buf_ecause[wb_robid] <= wb_ecause;

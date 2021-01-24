@@ -19,40 +19,31 @@ module decode(
   output [6:0]  decode_retop,
   output [15:0] decode_bptag,
   output        decode_bptaken,
-  output        decode_inhibit,
   input         rob_flush,
   input         rob_full,
   input [6:0]   rob_robid,
 
   // common rob/rename signals
-  output [31:2] decode_addr,
-
-  // common rob/rename/wb signals
   output [5:0]  decode_rd,
-
-  // common rob/wb signals
+  output [31:2] decode_addr,
   output        decode_forward,
   output [31:2] decode_target,
 
   // rename interface
   output        decode_rename_valid,
   output [4:0]  decode_rsop,
+  output [6:0]  decode_robid,
   output        decode_uses_rs1,
   output        decode_uses_rs2,
   output        decode_uses_imm,
   output        decode_uses_memory,
   output        decode_uses_pc,
   output        decode_csr_access,
+  output        decode_inhibit,
   output [4:0]  decode_rs1,
   output [4:0]  decode_rs2,
   output [31:0] decode_imm,
-  input         rename_stall,
-
-  // common rename/wb signals
-  output [6:0]  decode_robid,
-
-  // wb interface
-  output        decode_wb_valid);
+  input         rename_stall);
 
   reg        valid;
   reg        error;
@@ -130,7 +121,7 @@ module decode(
   assign rd = insn[11:7];
 
   wire uses_rd, uses_rs1, uses_rs2;
-  assign uses_rd = (fmt_r | fmt_i | fmt_u | fmt_j) & (rd != 0) & ~decode_forward;
+  assign uses_rd = (fmt_r | fmt_i | fmt_u | fmt_j) & (rd != 0);
   assign uses_rs1 = fmt_r | (fmt_i & (~insn_csr | ~funct3[2])) | fmt_s | fmt_b;
   assign uses_rs2 = fmt_r | fmt_s | fmt_b;
 
@@ -151,36 +142,27 @@ module decode(
   assign decode_retop = {fmt_b,funct3[0],insn_jalr,fmt_s,funct3};
   assign decode_bptag = bptag;
   assign decode_bptaken = bptaken;
-  assign decode_inhibit = insn_jalr;
 
   // common rob/rename signals
-  assign decode_forward = insn_jalr;
+  assign decode_rd = {~uses_rd,rd};
   assign decode_addr = addr[31:2];
-
-  // common rob/rename/wb signals
-  assign decode_rd = {~uses_rd,insn[11:7]};
-
-  // common rob/wb signals
+  assign decode_forward = insn_jalr;
   assign decode_target = target[31:2];
 
   // rename interface
   assign decode_rename_valid = valid & ~decode_error & ~rob_full;
   assign decode_rsop = rsop;
+  assign decode_robid = rob_robid;
   assign decode_uses_rs1 = uses_rs1;
   assign decode_uses_rs2 = uses_rs2;
   assign decode_uses_imm = ~fmt_r & ~fmt_b;
   assign decode_uses_memory = insn_load | fmt_s;
   assign decode_uses_pc = fmt_j | insn_auipc;
   assign decode_csr_access = insn_csr;
+  assign decode_inhibit = insn_jalr;
   assign decode_rs1 = rs1;
   assign decode_rs2 = rs2;
   assign decode_imm = fmt_j ? 4 : imm;
-
-  // common rename/wb signals
-  assign decode_robid = rob_robid;
-
-  // wb interface
-  assign decode_wb_valid = valid & ~decode_error & decode_forward & ~decode_stall;
 
   always @(posedge clk)
     if(rst | rob_flush)
