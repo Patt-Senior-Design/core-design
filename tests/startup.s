@@ -42,6 +42,12 @@ _start:
 	# la	t0, _vector_table
 	# csrw	mtvec, t0
 
+	# initialize counters
+	csrw	mcycleh, zero
+	csrw	mcycle, zero
+	csrw	minstreth, zero
+	csrw	minstret, zero
+
 	# copy data into ram
 	la	t0, _etext
 	la	t1, _sdata

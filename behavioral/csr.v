@@ -88,6 +88,48 @@ module csr(
       addr <= rename_imm[11:0];
   end
 
+  // address decoder
+  reg sel_mcycle, sel_mcycleh;
+  reg sel_minstret, sel_minstreth;
+  always @(*) begin
+    sel_mcycle = 0;
+    sel_mcycleh = 0;
+    sel_minstret = 0;
+    sel_minstreth = 0;
+    csr_error = 0;
+    case(addr)
+      MCYCLE: sel_mcycle = 1;
+      MCYCLEH: sel_mcycleh = 1;
+      MINSTRET: sel_minstret = 1;
+      MINSTRETH: sel_minstreth = 1;
+      default: csr_error = 1;
+    endcase
+  end
+
+  // read data mux
+  always @(*)
+    case(1)
+      sel_mcycle: csr_result = mcycle;
+      sel_mcycleh: csr_result = mcycleh;
+      sel_minstret: csr_result = minstret;
+      sel_minstreth: csr_result = minstreth;
+      default: csr_result = 0;
+    endcase
+
+  // write data mux
+  reg        wen;
+  reg [31:0] wdata;
+  always @(*) begin
+    wen = valid;
+    wdata = 0;
+    case(op[1:0])
+      2'b00: wen = 0;
+      2'b01: wdata = op1;
+      2'b10: wdata = csr_result | op1;
+      2'b11: wdata = csr_result & ~op1;
+    endcase
+  end
+
   // CSR latching
   always @(posedge clk) begin
     mcycle <= mcycle_n;
@@ -111,62 +153,13 @@ module csr(
                             (addr == MINSTRET));
 
     // Active updates: CSR instructions (overrides passive)
-    csr_error = 0;
-    case(addr) 
-      MCYCLE:   // mcycle_n = read_update (mcycle, valid, op[1:0]);
-                begin  
-                  if (valid) begin
-                    casez(op[1:0]) 
-                      2'b01:  mcycle_n = op1;             // CSRRW
-                      2'b10:  mcycle_n = (mcycle | op1);  // CSRRS 
-                      2'b11:  mcycle_n = (mcycle & ~op1); // CSRRC
-                      default:  mcycle_n = 32'hDEADBEEF;
-                    endcase
-                    csr_result = mcycle;
-                  end
-                end
-      MCYCLEH:  //  mcycleh_n   = read_update (mcycleh);
-                begin  
-                  if (valid) begin
-                    casez(op[1:0]) 
-                      2'b01:  mcycleh_n = op1;             // CSRRW
-                      2'b10:  mcycleh_n = (mcycleh | op1);  // CSRRS 
-                      2'b11:  mcycleh_n = (mcycleh & ~op1); // CSRRC
-                      default:  mcycleh_n = 32'hDEADBEEF;
-                    endcase
-                    csr_result = mcycleh;
-                  end
-                end
-      MINSTRET: //  minstret_n  = read_update (minstret);
-                begin  
-                  if (valid) begin
-                    casez(op[1:0]) 
-                      2'b01:  minstret_n = op1;             // CSRRW
-                      2'b10:  minstret_n = (minstret | op1);  // CSRRS 
-                      2'b11:  minstret_n = (minstret & ~op1); // CSRRC
-                      default:  minstret_n = 32'hDEADBEEF;
-                    endcase
-                    csr_result = minstret;
-                  end
-                end
-      MINSTRETH: // minstreth_n  = read_update (minstreth);
-                begin  
-                  if (valid) begin
-                    casez(op[1:0]) 
-                      2'b01:  minstreth_n = op1;             // CSRRW
-                      2'b10:  minstreth_n = (minstreth | op1);  // CSRRS 
-                      2'b11:  minstreth_n = (minstreth & ~op1); // CSRRC
-                      default:  minstreth_n = 32'hDEADBEEF;
-                    endcase
-                    csr_result = minstreth;
-                  end
-                end
-      default: begin
-        csr_error = 1;  // Undefined CSR
-        csr_result = 32'bx;
-      end
-    endcase
-
+    if(wen)
+      case(1)
+        sel_mcycle: mcycle_n = wdata;
+        sel_mcycleh: mcycleh_n = wdata;
+        sel_minstret: minstret_n = wdata;
+        sel_minstreth: minstreth_n = wdata;
+      endcase
   end
 
 endmodule
