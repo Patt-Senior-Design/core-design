@@ -73,9 +73,11 @@ module exers #(
     (input[RS_ENTRIES-1:0] vector, input bit_val);
     integer j;
     begin
-      for (j = 0; j < RS_ENTRIES; j++) 
-        if (vector[j] == bit_val) 
+      for (j = 0; j < RS_ENTRIES; j=j+1)
+        if (vector[j] == bit_val) begin
           find_idx[$clog2(RS_ENTRIES)-1:0] = j;
+          j = RS_ENTRIES;
+        end
       find_idx[$clog2(RS_ENTRIES)] = (bit_val ? (| vector) : (& vector));
     end
   endfunction
@@ -135,12 +137,10 @@ module exers #(
     endcase
     issue_stall = (~| {exers_scalu0_issue, exers_scalu1_issue, exers_mcalu0_issue, exers_mcalu1_issue});
 
-    // Insertion index: Use issue_idx if issued
     {rs_full, insert_idx} = find_idx(rs_valid, 0);
-    insert_idx = (issue_valid & (~issue_stall) ? issue_idx : insert_idx);
 
     // Stall combinational
-    exers_stall = (rs_full & (~issue_stall));
+    exers_stall = rs_full;
   end
   
 endmodule
