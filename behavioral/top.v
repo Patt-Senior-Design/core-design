@@ -283,8 +283,12 @@ module top();
         $fdisplay(tracefd);
       end
 
-      if(logfd)
-        $fdisplay(logfd, "%d: retire insn %x at addr %x (%x)", $stime, trace_insn[robid], {addr,2'b0}, addr);
+      if(logfd) begin
+        $fwrite(logfd, "%0d %x", $stime, {addr,2'b0});
+        if(~rd[5])
+          $fwrite(logfd, " %0d=%x", rd[4:0], result);
+        $fdisplay(logfd);
+      end
 
       // htif tohost write termination
       if(~error & trace_uses_mem[robid] & trace_memop[robid][3] & (memaddr[31:2] == DBG_TOHOST)) begin
