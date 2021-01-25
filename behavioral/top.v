@@ -143,6 +143,10 @@ module top();
   // indexed by lsqid
   reg [6:0]   trace_robid [0:31];
 
+  integer     trace_instret;
+  initial
+    trace_instret = 0;
+
   task trace_decode(
     input [6:0]  robid,
     input [31:0] insn,
@@ -249,6 +253,7 @@ module top();
 
     reg [31:0] memaddr;
     begin
+      trace_instret = trace_instret + 1;
       memaddr = trace_membase[robid] + trace_imm[robid];
 
       if(tracefd) begin
@@ -282,8 +287,21 @@ module top();
         $fdisplay(logfd, "%d: retire insn %x at addr %x (%x)", $stime, trace_insn[robid], {addr,2'b0}, addr);
 
       // htif tohost write termination
-      if(~error & trace_uses_mem[robid] & trace_memop[robid][3] & (memaddr[31:2] == DBG_TOHOST))
+      if(~error & trace_uses_mem[robid] & trace_memop[robid][3] & (memaddr[31:2] == DBG_TOHOST)) begin
+        printstats();
         $finish;
+      end
+    end
+  endtask
+
+  integer trace_cycles;
+  task printstats();
+    begin
+      trace_cycles = $stime / 10;
+      $display("*** SUMMARY STATISTICS ***");
+      $display("Cycles elapsed: %0d", trace_cycles);
+      $display("Instructions retired: %0d", trace_instret);
+      $display("Average CPI: %.3f", $itor(trace_cycles) / $itor(trace_instret));
     end
   endtask
 
