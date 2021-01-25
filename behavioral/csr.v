@@ -83,9 +83,9 @@ module csr(
     op <= rename_op[2:0];
     rd <= rename_rd;
     op1 <= rename_op1;
-    addr <= rename_imm[11:0];
     if (rename_csr_write & (~valid))
       robid <= rename_robid;
+      addr <= rename_imm[11:0];
   end
 
   // CSR latching
@@ -107,7 +107,8 @@ module csr(
   always @(*) begin
     // Passive updates
     {mcycleh_n, mcycle_n} = {mcycleh, mcycle} + 1;
-    {minstreth_n, minstret_n} = {minstreth, minstret} + (rob_ret_valid & (rob_csr_head !== robid));
+    {minstreth_n, minstret_n} = {minstreth, minstret} + (rob_ret_valid & (rob_csr_head !== robid) & 
+                            (addr == MINSTRET));
 
     // Active updates: CSR instructions (overrides passive)
     csr_error = 0;
