@@ -110,6 +110,23 @@ module lsq(
   assign lq_insert_beat = rename_beat & ~rename_op[3];
   assign sq_insert_beat = rename_beat & rename_op[3];
 
+  integer    i;
+  reg [31:2] lq_sq_addr;
+  reg        lq_sq_hit;
+  always @(*) begin
+    lq_sq_addr = 0;
+    for(i = 0; i < 16; i=i+1)
+      if(lq_issue_sel[i])
+        lq_sq_addr = lq_sq_addr | lq_addr[i][31:2];
+
+    lq_sq_hit = 0;
+    for(i = 0; i < 16; i=i+1)
+      if(lq_sq_sel[i] & sq_valid[i] & (~sq_addr_rdy[i] | (sq_addr[i][31:2] == lq_sq_addr))) begin
+        lq_sq_hit = 1;
+        i = 16;
+      end
+  end
+
   wire lq_issue_req, sq_issue_req;
   assign lq_issue_req = lq_issue_rdy & ~lq_sq_hit & ~rob_flush;
   assign sq_issue_req = sq_valid[sq_head] & sq_addr_rdy[sq_head] & sq_issue_rdy[sq_head] & ~rob_flush;
@@ -140,23 +157,6 @@ module lsq(
   integer sq_addrgen_idx;
   always @(*)
     sq_addrgen_idx = $clog2(sq_addrgen_sel_r);
-
-  integer    i;
-  reg [31:2] lq_sq_addr;
-  reg        lq_sq_hit;
-  always @(*) begin
-    lq_sq_addr = 0;
-    for(i = 0; i < 16; i=i+1)
-      if(lq_issue_sel[i])
-        lq_sq_addr = lq_sq_addr | lq_addr[i][31:2];
-
-    lq_sq_hit = 0;
-    for(i = 0; i < 16; i=i+1)
-      if(lq_sq_sel[i] & sq_valid[i] & (~sq_addr_rdy[i] | (sq_addr[i][31:2] == lq_sq_addr))) begin
-        lq_sq_hit = 1;
-        i = 16;
-      end
-  end
 
   // rename interface
   assign lsq_stall = ~lq_insert_rdy | ~sq_insert_rdy;
