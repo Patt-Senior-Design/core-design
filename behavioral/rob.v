@@ -51,6 +51,7 @@ module rob(
   input [31:2]  csr_tvec,
   output        rob_ret_valid,
   output        rob_csr_valid,
+  output [6:0]  rob_csr_head,
   output [31:2] rob_csr_epc,
   output [4:0]  rob_csr_ecause,
   output [31:0] rob_csr_tval);
@@ -112,7 +113,7 @@ module rob(
   assign rob_robid = buf_tail;
   
   // rename interface: CSR execution
-  assign rob_rename_head = buf_head;
+  assign rob_rename_head = ret_rd_addr;
 
   // common signals
   assign rob_flush = ret_exc | ret_mispred;
@@ -126,6 +127,7 @@ module rob(
   assign rob_csr_epc = ret_addr;
   assign rob_csr_ecause = ret_ecause;
   assign rob_csr_tval = 0; // TODO
+  assign rob_csr_head = buf_head;
 
   // rat interface
   assign rob_ret_commit = rob_ret_valid & ~ret_rd[5];

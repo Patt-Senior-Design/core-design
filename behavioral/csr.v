@@ -23,6 +23,7 @@ module csr(
   input         rob_flush,
   input         rob_ret_valid,
   input         rob_csr_valid,
+  input [6:0]   rob_csr_head,
   input [31:2]  rob_csr_epc,
   input [4:0]   rob_csr_ecause,
   input [31:0]  rob_csr_tval,
@@ -61,11 +62,11 @@ module csr(
 
   // Sets read value. Returns write value (either passive or updated using csr instruction).
   /* NOTE: Doesn't work in simulation for some strange reason.. ಠ_ಠ */
-  /*function automatic [31:0] read_update (input[31:0] csr_cur_val);
+  /*function automatic [31:0] read_update (input[31:0] csr_cur_val, input write, input funct2);
     begin
       // Write logic
-      if (valid) begin
-        casez(op[1:0]) 
+      if (write) begin
+        casez(funct2) 
           2'b01:  read_update = op1;                  // CSRRW
           2'b10:  read_update = (csr_cur_val | op1);  // CSRRS 
           2'b11:  read_update = (csr_cur_val & ~op1); // CSRRC
@@ -76,14 +77,15 @@ module csr(
     end
   endfunction*/
 
-  // Stage latches
+  // Stage latches: ROBID only latched when valid to handle minstret
   always @(posedge clk) begin
     valid <= rename_csr_write & (~valid);
     op <= rename_op[2:0];
-    robid <= rename_robid;
     rd <= rename_rd;
     op1 <= rename_op1;
     addr <= rename_imm[11:0];
+    if (rename_csr_write & (~valid))
+      robid <= rename_robid;
   end
 
   // CSR latching
@@ -104,15 +106,13 @@ module csr(
   // Update CSR logic
   always @(*) begin
     // Passive updates
-    mcycle_n = mcycle + 1;
-    mcycleh_n = mcycleh_n + (|mcycle);
-    minstret_n = minstret + rob_ret_valid;
-    minstreth_n = minstreth_n + (|minstret & rob_ret_valid);
+    {mcycleh_n, mcycle_n} = {mcycleh, mcycle} + 1;
+    {minstreth_n, minstret_n} = {minstreth, minstret} + (rob_ret_valid & (rob_csr_head !== robid));
 
     // Active updates: CSR instructions (overrides passive)
     csr_error = 0;
     case(addr) 
-      MCYCLE:   // mcycle_n = read_update (mcycle);
+      MCYCLE:   // mcycle_n = read_update (mcycle, valid, op[1:0]);
                 begin  
                   if (valid) begin
                     casez(op[1:0]) 
