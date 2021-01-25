@@ -116,6 +116,9 @@ module top();
   reg [3:0]   trace_memop [0:127];
   reg [31:0]  trace_membase [0:127];
   reg [31:0]  trace_memdata [0:127];
+  reg [127:0] trace_writes_csr;
+  // reuse trace_membase for csr address
+  // reuse trace_memdata for csr data
 
   // indexed by lsqid
   reg [6:0]   trace_robid [0:31];
@@ -129,6 +132,7 @@ module top();
       trace_insn[robid] = insn;
       trace_imm[robid] = imm;
       trace_uses_mem[robid] = 0;
+      trace_writes_csr[robid] = 0;
     end
   endtask
 
@@ -170,6 +174,51 @@ module top();
     end
   endtask
 
+  task trace_csr_write(
+    input [6:0]  robid,
+    input [11:0] addr,
+    input [31:0] data);
+
+    // reuse trace_membase for csr address
+    // reuse trace_memdata for csr data
+    begin
+      trace_writes_csr[robid] = 1;
+      trace_membase[robid] = addr;
+      trace_memdata[robid] = data;
+    end
+  endtask
+
+  function [16*8-1:0] csr_name(
+    input [11:0] addr);
+
+    case(addr)
+      12'h300: csr_name = "mstatus";
+      12'h301: csr_name = "misa";
+      12'h302: csr_name = "medeleg";
+      12'h303: csr_name = "mideleg";
+      12'h304: csr_name = "mie";
+      12'h305: csr_name = "mtvec";
+      12'h306: csr_name = "mcounteren";
+      12'h310: csr_name = "mstatush";
+      12'h340: csr_name = "mscratch";
+      12'h341: csr_name = "mepc";
+      12'h342: csr_name = "mcause";
+      12'h343: csr_name = "mtval";
+      12'h344: csr_name = "mip";
+      12'h34a: csr_name = "mtinst";
+      12'h34b: csr_name = "mtval2";
+      12'hb00: csr_name = "mcycle";
+      12'hb02: csr_name = "minstret";
+      12'hb80: csr_name = "mcycleh";
+      12'hb82: csr_name = "minstreth";
+      12'hf11: csr_name = "mvendorid";
+      12'hf12: csr_name = "marchid";
+      12'hf13: csr_name = "mimpid";
+      12'hf14: csr_name = "mhartid";
+      default: csr_name = "<unknown>";
+    endcase
+  endfunction
+
   task trace_rob_retire(
     input [6:0]  robid,
     input [31:2] addr,
@@ -201,6 +250,9 @@ module top();
                 $fwrite(tracefd, " 0x%x", trace_memdata[robid]);
             endcase
         end
+        if(trace_writes_csr[robid])
+          $fwrite(tracefd, " c%0d_%0s 0x%x", trace_membase[robid],
+            csr_name(trace_membase[robid]), trace_memdata[robid]);
       end
       $fdisplay(tracefd);
 

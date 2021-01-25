@@ -162,4 +162,11 @@ module csr(
       endcase
   end
 
+  always @(posedge clk)
+    if(valid & ~csr_error & wen)
+      top.trace_csr_write(
+        robid,
+        addr,
+        wdata);
+
 endmodule
