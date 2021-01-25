@@ -19,7 +19,7 @@ module rob(
 
   // rename interface
   input         rename_inhibit,
-  output        rob_rename_head,
+  output [6:0]  rob_rename_head,
 
   // wb interface
   input         wb_valid,

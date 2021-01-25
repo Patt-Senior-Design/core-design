@@ -56,7 +56,7 @@ module rename(
 
   // rob interface
   input             rob_flush,
-  input             rob_rename_head,
+  input [6:0]       rob_rename_head,
   output reg        rename_inhibit);
 
   // decode signals
