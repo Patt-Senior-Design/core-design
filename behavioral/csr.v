@@ -29,10 +29,10 @@ module csr(
   output [31:2] csr_tvec);
 
   localparam
-    MCYCLE    = 32'h0B00,
-    MINSTRET  = 32'h0B02,
-    MCYCLEH   = 32'h0B80,
-    MINSTRETH = 32'h0B82;
+    MCYCLE    = 12'hB00,
+    MINSTRET  = 12'hB02,
+    MCYCLEH   = 12'hB80,
+    MINSTRETH = 12'hB82;
 
   // Supported CSRs
   reg [31:0] mcycle;
@@ -59,9 +59,9 @@ module csr(
   // CSR Errors: TBD
   assign csr_ecause = 0;
 
-  // Returns write value (either passive or updated using csr instruction).
-  // Sets read value
-  function automatic [31:0] read_update (input[31:0] csr_cur_val);
+  // Sets read value. Returns write value (either passive or updated using csr instruction).
+  /* NOTE: Doesn't work in simulation for some strange reason.. ಠ_ಠ */
+  /*function automatic [31:0] read_update (input[31:0] csr_cur_val);
     begin
       // Write logic
       if (valid) begin
@@ -69,13 +69,12 @@ module csr(
           2'b01:  read_update = op1;                  // CSRRW
           2'b10:  read_update = (csr_cur_val | op1);  // CSRRS 
           2'b11:  read_update = (csr_cur_val & ~op1); // CSRRC
-          default:  read_update = 32'bx;
+          default:  read_update = 32'hDEADBEEF;
         endcase
       end
-      // Read logic
-      csr_result = csr_cur_val;
+      csr_result = csr_cur_val; // Read
     end
-  endfunction
+  endfunction*/
 
   // Stage latches
   always @(posedge clk) begin
@@ -93,6 +92,13 @@ module csr(
     mcycleh <= mcycleh_n;
     minstret <= minstret_n;
     minstreth <= minstreth_n;  
+    /* For Simulation Only */
+    if (rst) begin
+      mcycle <= 0;
+      mcycleh <= 0;
+      minstret <= 0;
+      minstreth <= 0;
+    end
   end
 
   // Update CSR logic
@@ -105,11 +111,55 @@ module csr(
 
     // Active updates: CSR instructions (overrides passive)
     csr_error = 0;
-    casez(addr) 
-      MCYCLE:     mcycle_n    = read_update (mcycle);
-      MCYCLEH:    mcycleh_n   = read_update (mcycleh);
-      MINSTRET:   minstret_n  = read_update (minstret);
-      MINSTRETH:  minstret_n  = read_update (minstreth);
+    case(addr) 
+      MCYCLE:   // mcycle_n = read_update (mcycle);
+                begin  
+                  if (valid) begin
+                    casez(op[1:0]) 
+                      2'b01:  mcycle_n = op1;             // CSRRW
+                      2'b10:  mcycle_n = (mcycle | op1);  // CSRRS 
+                      2'b11:  mcycle_n = (mcycle & ~op1); // CSRRC
+                      default:  mcycle_n = 32'hDEADBEEF;
+                    endcase
+                    csr_result = mcycle;
+                  end
+                end
+      MCYCLEH:  //  mcycleh_n   = read_update (mcycleh);
+                begin  
+                  if (valid) begin
+                    casez(op[1:0]) 
+                      2'b01:  mcycleh_n = op1;             // CSRRW
+                      2'b10:  mcycleh_n = (mcycleh | op1);  // CSRRS 
+                      2'b11:  mcycleh_n = (mcycleh & ~op1); // CSRRC
+                      default:  mcycleh_n = 32'hDEADBEEF;
+                    endcase
+                    csr_result = mcycleh;
+                  end
+                end
+      MINSTRET: //  minstret_n  = read_update (minstret);
+                begin  
+                  if (valid) begin
+                    casez(op[1:0]) 
+                      2'b01:  minstret_n = op1;             // CSRRW
+                      2'b10:  minstret_n = (minstret | op1);  // CSRRS 
+                      2'b11:  minstret_n = (minstret & ~op1); // CSRRC
+                      default:  minstret_n = 32'hDEADBEEF;
+                    endcase
+                    csr_result = minstret;
+                  end
+                end
+      MINSTRETH: // minstreth_n  = read_update (minstreth);
+                begin  
+                  if (valid) begin
+                    casez(op[1:0]) 
+                      2'b01:  minstreth_n = op1;             // CSRRW
+                      2'b10:  minstreth_n = (minstreth | op1);  // CSRRS 
+                      2'b11:  minstreth_n = (minstreth & ~op1); // CSRRC
+                      default:  minstreth_n = 32'hDEADBEEF;
+                    endcase
+                    csr_result = minstreth;
+                  end
+                end
       default: begin
         csr_error = 1;  // Undefined CSR
         csr_result = 32'bx;
