@@ -10,6 +10,7 @@ module csr(
   input [5:0]   rename_rd,
   input [31:0]  rename_op1,
   input [31:0]  rename_op2,
+  input [31:0]  rename_imm,
 
   // wb interface
   output        csr_valid,

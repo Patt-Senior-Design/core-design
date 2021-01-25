@@ -57,6 +57,7 @@ module rename(
   input             rob_flush,
   output reg        rename_inhibit);
 
+  // decode signals
   reg valid;
   reg stall;
   reg [6:0] robid;
@@ -76,7 +77,10 @@ module rename(
   reg [4:0] rs2;
   reg [31:0] imm;
 
-  
+  // csr stall regs
+  reg csr_entry_stall;
+  reg csr_exit_stall;
+
   always @(posedge clk) begin
     if (!rename_stall) begin
       valid <= decode_rename_valid;
@@ -116,10 +120,10 @@ module rename(
       
     // OP generation
     case ({uses_rs1, uses_pc})
-      // LUI
+      // LUI, CSR Imm
       2'b00: begin
         rename_op1ready = 1;
-        rename_op1 = imm;
+        rename_op1 = (csr_access ? rs1 : imm);
         rename_op2ready = 1;
         rename_op2 = 0;
       end
@@ -135,7 +139,7 @@ module rename(
         rename_op1ready = rat_rs1_valid;
         rename_op1 = rat_rs1_tagval;
         casez ({uses_rs2, uses_imm})
-          // OP/I and LD
+          // OP/I, LD, CSR
           2'b01: begin
             rename_op2ready = 1;
             rename_op2 = imm;
@@ -162,7 +166,7 @@ module rename(
     rename_imm = imm;
     
     // stall combinational
-    rename_stall = (rename_exers_write & exers_stall) | (rename_lsq_write & lsq_stall);
+    rename_stall = (rename_exers_write & exers_stall) | (rename_lsq_write & lsq_stall) | ();
 
     rename_rs1 = rs1;
     rename_rs2 = rs2;
