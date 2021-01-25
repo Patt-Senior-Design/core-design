@@ -30,7 +30,17 @@ module top();
     ROM_SIZE   = (64*1024)/4,
     RAM_BASE   = 32'h20000000/4,
     RAM_SIZE   = (4*1024*1024)/4,
-    DBG_TOHOST = 32'h30000000/4;
+    DBG_TOHOST = 32'h30000000/4,
+    UART_STAT  = 32'h30010000/4,
+    UART_RX    = 32'h30010004/4,
+    UART_TX    = 32'h30010008/4;
+
+  // uart status bits
+  localparam
+    UART_RXEMPTY = 4'b0001,
+    UART_RXFULL  = 4'b0010,
+    UART_TXEMPTY = 4'b0100,
+    UART_TXFULL  = 4'b1000;
 
   task automatic openargfile(
     input [16*8-1:0] argname,
@@ -76,6 +86,11 @@ module top();
     end
   end
 
+  reg [128*8-1:0] uartfile;
+  integer         uartfd;
+  initial
+    openargfile("uartfile", "w", uartfd, STDOUT);
+
   task automatic mem_read(
     input [31:2]      addr,
     output reg [31:0] rdata);
@@ -85,6 +100,8 @@ module top();
         rdata = mem_rom[addr-ROM_BASE];
       else if(addr >= RAM_BASE && addr < (RAM_BASE+RAM_SIZE))
         rdata = mem_ram[addr-RAM_BASE];
+      else if(addr == UART_STAT)
+        rdata = UART_TXEMPTY | UART_RXEMPTY;
       else
         rdata = 0;
     end
@@ -97,10 +114,12 @@ module top();
 
     integer i;
     begin
-      if(addr >= RAM_BASE && addr < (RAM_BASE+RAM_SIZE))
+      if(addr >= RAM_BASE && addr < (RAM_BASE+RAM_SIZE)) begin
         for(i = 0; i < 4; i=i+1)
           if(wmask[i])
             mem_ram[addr-RAM_BASE][i*8+:8] = wdata[i*8+:8];
+      end else if(addr == UART_TX && wmask[0])
+        $fwrite(uartfd, "%c", wdata[7:0]);
     end
   endtask
 
