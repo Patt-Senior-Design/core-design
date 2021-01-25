@@ -19,7 +19,7 @@ module rob(
 
   // rename interface
   input         rename_inhibit,
-  output        rob_ret_valid,
+  output        rob_rename_head,
 
   // wb interface
   input         wb_valid,
@@ -49,6 +49,7 @@ module rob(
 
   // csr interface
   input [31:2]  csr_tvec,
+  output        rob_ret_valid,
   output        rob_csr_valid,
   output [31:2] rob_csr_epc,
   output [4:0]  rob_csr_ecause,
@@ -109,16 +110,25 @@ module rob(
   // decode interface
   assign rob_full = buf_full;
   assign rob_robid = buf_tail;
+  
+  // rename interface: CSR execution
+  assign rob_rename_head = buf_head;
 
   // common signals
   assign rob_flush = ret_exc | ret_mispred;
-  assign rob_ret_valid = ret_valid & ~ret_error;
 
   // fetch interface
   assign rob_flush_pc = ret_error ? csr_tvec : (ret_forwarded ? ret_result[31:2] : ret_target);
 
+  // csr interface
+  assign rob_ret_valid = ret_valid & ~ret_error;
+  assign rob_csr_valid = ret_exc;
+  assign rob_csr_epc = ret_addr;
+  assign rob_csr_ecause = ret_ecause;
+  assign rob_csr_tval = 0; // TODO
+
   // rat interface
-  assign rob_ret_commit = rob_ret_valid & ~ret_rd[5]
+  assign rob_ret_commit = rob_ret_valid & ~ret_rd[5];
   assign rob_ret_rd = ret_rd[4:0];
   assign rob_ret_result = ret_forwarded ? {ret_target,2'b0} : ret_result;
 
@@ -129,12 +139,6 @@ module rob(
 
   // lsq interface (out)
   assign rob_ret_store = ret_valid & ~ret_error & ret_retop[3];
-
-  // csr interface
-  assign rob_csr_valid = ret_exc;
-  assign rob_csr_epc = ret_addr;
-  assign rob_csr_ecause = ret_ecause;
-  assign rob_csr_tval = 0; // TODO
 
   // buf_head
   always @(posedge clk)

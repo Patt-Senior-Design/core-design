@@ -21,7 +21,7 @@ module rename(
   input [4:0]      decode_rs1,
   input [4:0]      decode_rs2,
   input [31:0]     decode_imm,
-  output reg       rename_stall, // 
+  output reg       rename_stall,  
 
   // rat interface
   output reg [4:0] rename_rs1,
@@ -40,14 +40,15 @@ module rename(
   output reg       rename_exers_write,
   output reg       rename_lsq_write,
   output reg       rename_csr_write,
-  output reg [4:0] rename_op, //
+  output reg [4:0] rename_op, 
   output reg       rename_op1ready,
   output reg [31:0] rename_op1,
   output reg       rename_op2ready,
   output reg [31:0] rename_op2,
-  output reg [31:0] rename_imm, //
+  output reg [31:0] rename_imm, 
   input            exers_stall,
   input            lsq_stall,
+  input            csr_valid, // Prevent forwarding for 1 cycle
 
   // wb interface
   output reg        rename_wb_valid,
@@ -55,7 +56,7 @@ module rename(
 
   // rob interface
   input             rob_flush,
-  input             rob_ret_valid,
+  input             rob_rename_head,
   output reg        rename_inhibit);
 
   // decode signals
@@ -78,9 +79,12 @@ module rename(
   reg [4:0] rs2;
   reg [31:0] imm;
 
-  // csr stall regs
-  reg csr_entry_stall;
-  reg csr_exit_stall;
+  // csr stall logic
+  wire csr_valid_access;
+  assign csr_valid_access = valid & csr_access; 
+
+  wire prior_inflight_ret;
+  assign prior_inflight_ret = (rob_rename_head == robid);
 
   always @(posedge clk) begin
     if (!rename_stall) begin
@@ -113,18 +117,18 @@ module rename(
   always @(*) begin
     // reservation stations seq
     rename_lsq_write = valid & uses_memory;
-    rename_csr_write = valid & csr_access;
     rename_exers_write = valid & (~uses_memory) & (~csr_access); 
+    rename_csr_write = csr_valid_access & prior_inflight_ret;
     rename_op = op;
     rename_robid = robid;
     rename_rd = rd | {forward,5'b0}; // inhibit uses_rd if forwarding
       
     // OP generation
-    case ({uses_rs1, uses_pc})
+    casez ({uses_rs1, uses_pc})
       // LUI, CSR Imm
       2'b00: begin
         rename_op1ready = 1;
-        rename_op1 = (csr_access ? rs1 : imm);
+        rename_op1 = (csr_access ? {27'b0, rs1} : imm);
         rename_op2ready = 1;
         rename_op2 = 0;
       end
@@ -167,7 +171,8 @@ module rename(
     rename_imm = imm;
     
     // stall combinational
-    rename_stall = (rename_exers_write & exers_stall) | (rename_lsq_write & lsq_stall);
+    rename_stall = (rename_exers_write & exers_stall) | (rename_lsq_write & lsq_stall) | 
+                    (csr_valid_access & ~prior_inflight_ret) | csr_valid;
 
     rename_rs1 = rs1;
     rename_rs2 = rs2;
