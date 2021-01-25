@@ -253,16 +253,12 @@ module decode(
     case(1)
       decode_uses_memory:
         rsop = {1'b0,fmt_s,funct3};
-      insn_complex:
-        rsop = {2'b11,funct3};
-      insn_jalr:
-        rsop = 5'b10000;
-      fmt_j, fmt_u:
+      fmt_j, insn_jalr, fmt_u:
         rsop = 5'b00000;
       fmt_b:
         rsop = {2'b01,brop};
       default:
-        rsop = {1'b0,altop,funct3};
+        rsop = {insn_complex,altop,funct3};
     endcase
 
   always @(posedge clk)
