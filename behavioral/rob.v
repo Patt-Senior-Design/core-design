@@ -88,14 +88,17 @@ module rob(
 
   wire [7:0] buf_head_next;
   wire [6:0] ret_rd_addr;
+  wire       ret_rd_addr_pol;
 
   // forward buf_head when reading consecutive addrs
+  wire ret_rd_empty;
   assign buf_head_next = {buf_head_pol,buf_head} + 1;
   assign ret_rd_addr = ret_valid ? buf_head_next[6:0] : buf_head;
+  assign ret_rd_addr_pol = ret_valid ? buf_head_next[7] : buf_head_pol;
+  assign ret_rd_empty = (ret_rd_addr == buf_tail) & (ret_rd_addr_pol == buf_tail_pol);
 
   // derived signals
-  wire buf_empty, buf_full;
-  assign buf_empty = (buf_head == buf_tail) & (buf_head_pol == buf_tail_pol);
+  wire buf_full;
   assign buf_full  = (buf_head == buf_tail) & (buf_head_pol != buf_tail_pol);
 
   wire decode_beat;
@@ -170,7 +173,7 @@ module rob(
     if(rst | rob_flush)
       ret_valid <= 0;
     else begin
-      ret_valid <= buf_executed[ret_rd_addr] & ~buf_empty;
+      ret_valid <= buf_executed[ret_rd_addr] & ~ret_rd_empty;
       ret_error <= buf_error[ret_rd_addr];
       ret_retop <= buf_retop[ret_rd_addr];
       ret_addr <= buf_addr[ret_rd_addr];
