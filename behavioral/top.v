@@ -125,7 +125,7 @@ module top();
 
   integer         tracefd, logfd;
   initial begin
-    openargfile("tracefile", "w", tracefd, STDOUT);
+    openargfile("tracefile", "w", tracefd, 0);
     openargfile("logfile", "w", logfd, 0);
   end
 
@@ -251,30 +251,32 @@ module top();
     begin
       memaddr = trace_membase[robid] + trace_imm[robid];
 
-      $fwrite(tracefd, "core   0: 3 0x%x (0x%x)", {addr,2'b0}, trace_insn[robid]);
-      if(error)
-        $fwrite(tracefd, " error %0d", ecause);
-      else begin
-        if(~rd[5])
-          $fwrite(tracefd, " x%d 0x%x", rd[4:0], result);
-        if(trace_uses_mem[robid]) begin
-          $fwrite(tracefd, " mem 0x%x", memaddr);
-          if(trace_memop[robid][3])
-            case(trace_memop[robid][1:0])
-              2'b00: // byte write
-                // needs to be %0x to match spike
-                $fwrite(tracefd, " 0x%0x", trace_memdata[robid][7:0]);
-              2'b01: // halfword write
-                $fwrite(tracefd, " 0x%x", trace_memdata[robid][15:0]);
-              default: // word write
-                $fwrite(tracefd, " 0x%x", trace_memdata[robid]);
-            endcase
+      if(tracefd) begin
+        $fwrite(tracefd, "core   0: 3 0x%x (0x%x)", {addr,2'b0}, trace_insn[robid]);
+        if(error)
+          $fwrite(tracefd, " error %0d", ecause);
+        else begin
+          if(~rd[5])
+            $fwrite(tracefd, " x%d 0x%x", rd[4:0], result);
+          if(trace_uses_mem[robid]) begin
+            $fwrite(tracefd, " mem 0x%x", memaddr);
+            if(trace_memop[robid][3])
+              case(trace_memop[robid][1:0])
+                2'b00: // byte write
+                  // needs to be %0x to match spike
+                  $fwrite(tracefd, " 0x%0x", trace_memdata[robid][7:0]);
+                2'b01: // halfword write
+                  $fwrite(tracefd, " 0x%x", trace_memdata[robid][15:0]);
+                default: // word write
+                  $fwrite(tracefd, " 0x%x", trace_memdata[robid]);
+              endcase
+          end
+          if(trace_writes_csr[robid])
+            $fwrite(tracefd, " c%0d_%0s 0x%x", trace_membase[robid],
+              csr_name(trace_membase[robid]), trace_memdata[robid]);
         end
-        if(trace_writes_csr[robid])
-          $fwrite(tracefd, " c%0d_%0s 0x%x", trace_membase[robid],
-            csr_name(trace_membase[robid]), trace_memdata[robid]);
+        $fdisplay(tracefd);
       end
-      $fdisplay(tracefd);
 
       if(logfd)
         $fdisplay(logfd, "%d: retire insn %x at addr %x (%x)", $stime, trace_insn[robid], {addr,2'b0}, addr);
