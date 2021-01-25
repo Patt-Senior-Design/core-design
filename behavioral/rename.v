@@ -55,6 +55,7 @@ module rename(
 
   // rob interface
   input             rob_flush,
+  input             rob_ret_valid,
   output reg        rename_inhibit);
 
   // decode signals
@@ -134,7 +135,7 @@ module rename(
         rename_op2ready = 1;
         rename_op2 = imm;
       end
-      // Normal instructions
+      // Most instructions
       2'b10: begin
         rename_op1ready = rat_rs1_valid;
         rename_op1 = rat_rs1_tagval;
@@ -166,7 +167,7 @@ module rename(
     rename_imm = imm;
     
     // stall combinational
-    rename_stall = (rename_exers_write & exers_stall) | (rename_lsq_write & lsq_stall) | ();
+    rename_stall = (rename_exers_write & exers_stall) | (rename_lsq_write & lsq_stall);
 
     rename_rs1 = rs1;
     rename_rs2 = rs2;

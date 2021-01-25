@@ -19,6 +19,7 @@ module rob(
 
   // rename interface
   input         rename_inhibit,
+  output        rob_ret_valid,
 
   // wb interface
   input         wb_valid,
@@ -34,7 +35,7 @@ module rob(
   output [31:2] rob_flush_pc,
 
   // rat interface
-  output        rob_ret_valid,
+  output        rob_ret_commit,
   output [4:0]  rob_ret_rd,
   output [31:0] rob_ret_result,
 
@@ -111,12 +112,13 @@ module rob(
 
   // common signals
   assign rob_flush = ret_exc | ret_mispred;
+  assign rob_ret_valid = ret_valid & ~ret_error;
 
   // fetch interface
   assign rob_flush_pc = ret_error ? csr_tvec : (ret_forwarded ? ret_result[31:2] : ret_target);
 
   // rat interface
-  assign rob_ret_valid = ret_valid & ~ret_error & ~ret_rd[5];
+  assign rob_ret_commit = rob_ret_valid & ~ret_rd[5]
   assign rob_ret_rd = ret_rd[4:0];
   assign rob_ret_result = ret_forwarded ? {ret_target,2'b0} : ret_result;
 

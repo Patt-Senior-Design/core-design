@@ -23,7 +23,7 @@ module rat(
 
   // rob interface
   input             rob_flush,
-  input             rob_ret_valid,
+  input             rob_ret_commit,
   input [4:0]       rob_ret_rd,
   input [31:0]      rob_ret_result);
 
@@ -77,7 +77,7 @@ module rat(
   end
   // committed data write
   always @(posedge clk)
-    if(rob_ret_valid)
+    if(rob_ret_commit)
       rat_comm_val[rob_ret_rd] <= rob_ret_result;
 
   // speculative data read
