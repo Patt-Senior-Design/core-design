@@ -1,7 +1,6 @@
 	.text
 	.global _start
 	.global _vector_table
-	.global _exit
 
 _start:
 	# zero registers
@@ -43,10 +42,10 @@ _start:
 	# csrw	mtvec, t0
 
 	# initialize counters
-	csrw	mcycleh, zero
-	csrw	mcycle, zero
-	csrw	minstreth, zero
-	csrw	minstret, zero
+	# csrw	mcycleh, zero
+	# csrw	mcycle, zero
+	# csrw	minstreth, zero
+	# csrw	minstret, zero
 
 	# copy data into ram
 	la	t0, _etext
