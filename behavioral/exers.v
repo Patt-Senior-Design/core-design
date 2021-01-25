@@ -100,11 +100,11 @@ module exers #(
     end
     // Dependency resolution: matching tags on valid writeback/uses rd
     for (i = 0; i  < RS_ENTRIES; i = i + 1) begin
-      if (resolve_valid & (~rs_op1ready[i]) & (rs_op1[i][6:0] == wb_robid)) begin
+      if (resolve_valid & rs_valid[i] & (~rs_op1ready[i]) & (rs_op1[i][6:0] == wb_robid)) begin
         rs_op1ready[i] <= 1'b1;
         rs_op1[i] <= wb_result;
       end
-      if (resolve_valid & (~rs_op2ready[i]) & (rs_op2[i][6:0] == wb_robid)) begin
+      if (resolve_valid & rs_valid[i] & (~rs_op2ready[i]) & (rs_op2[i][6:0] == wb_robid)) begin
         rs_op2ready[i] <= 1'b1;
         rs_op2[i] <= wb_result;
       end
