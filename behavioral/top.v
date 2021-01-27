@@ -144,8 +144,13 @@ module top();
   reg [6:0]   trace_robid [0:31];
 
   integer     trace_instret;
-  initial
+  integer     trace_branches;
+  integer     trace_mispreds;
+  initial begin
     trace_instret = 0;
+    trace_branches = 0;
+    trace_mispreds = 0;
+  end
 
   task trace_decode(
     input [6:0]  robid,
@@ -245,8 +250,10 @@ module top();
 
   task trace_rob_retire(
     input [6:0]  robid,
+    input [6:0]  retop,
     input [31:2] addr,
     input        error,
+    input        mispred,
     input [4:0]  ecause,
     input [5:0]  rd,
     input [31:0] result);
@@ -254,6 +261,11 @@ module top();
     reg [31:0] memaddr;
     begin
       trace_instret = trace_instret + 1;
+      if(retop[6]) begin
+        trace_branches = trace_branches + 1;
+        if(mispred)
+          trace_mispreds = trace_mispreds + 1;
+      end
       memaddr = trace_membase[robid] + trace_imm[robid];
 
       if(tracefd) begin
@@ -306,6 +318,7 @@ module top();
       $display("Cycles elapsed: %0d", trace_cycles);
       $display("Instructions retired: %0d", trace_instret);
       $display("Average CPI: %.3f", $itor(trace_cycles) / $itor(trace_instret));
+      $display("Branch prediction accuracy: %.2f", 1.0 - ($itor(trace_mispreds) / $itor(trace_branches)));
     end
   endtask
 

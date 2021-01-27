@@ -213,8 +213,10 @@ module rob(
     if(ret_valid)
       top.trace_rob_retire(
         buf_head,
+        ret_retop,
         ret_addr,
         ret_error,
+        ret_mispred,
         ret_ecause,
         ret_rd,
         rob_ret_result);
