@@ -125,7 +125,7 @@ module exers #(
     exers_mcalu_op = rs_op[issue_idx];
     exers_scalu_op = rs_op[issue_idx];
 
-    is_sc_op = (~& rs_op[issue_idx][4:3]);
+    is_sc_op = (~rs_op[issue_idx][4]);
     // NOTE: Can be modelled as issue array and stall array directly at inputs
     fu_issue_q = {is_sc_op & (~scalu0_stall), is_sc_op & (~scalu1_stall), ~mcalu0_stall, ~mcalu1_stall};
     casez(fu_issue_q)
