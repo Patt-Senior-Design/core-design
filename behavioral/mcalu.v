@@ -93,10 +93,11 @@ module mcalu(
   reg inv, inv_c;
 
   // Booth combinational
-  reg [35:0] mplier; // Extra MSB, 2 extra bits for negation correction
-  reg [33:0] mpli_op;
+  reg [35:0] ptl_prod; // Extra MSB, 2 extra bits for negation correction
+  reg [33:0] ptl_prod_i;
   reg [63:0] mul_result;
-  
+  reg se_bit;
+
   wire single, double, neg;
   wire x2, x1;
   assign {x2, x1} = acc[1:0];
@@ -110,19 +111,65 @@ module mcalu(
   /* */
 
   /* DIV */
-  reg [31:0] dsor;
-  reg [31:0] dnd;
+  reg [63:0] d_acc, d_acc_c;
+  reg [33:0] dsor, dsor_c;
+  reg [4:0] d_iter, d_iter_c;
+  reg dvd_sgn, dvd_sgn_c;
+  reg dsor_sgn, dsor_sgn_c;
+  
+  // Restoring combinational
+  reg [31:0] dvd;
+  reg [64:0] d_shf;
+  reg [31:0] ptl_rem_n;
+  reg [33:0] cmp_res;
+  reg [31:0] div_result;
+
+  wire [33:0] ptl_rem;
+  assign ptl_rem = {1'b0, d_shf[64:32]};
+
+  // State control
+  reg [1:0] d_state;
+  reg [1:0] d_next_state;
   /* */
 
   always @(*) begin
     if (op[4]) begin
       if (op[2]) begin  // DIV,REM
-        /*casez(state) 
+        casez(d_state) 
           INIT: begin
+            // Positive dividend, negative divisor
+            dvd_sgn_c = op1[31] & ~op[0];
+            dsor_sgn_c = op2[31] & ~op[0]; 
+            dvd = (dvd_sgn_c ? ~op1 + 1 : op1);
+            dsor_c[33:0] = (dsor_sgn_c ? {2'b11, op2} : {2'b11, ~op2} + 1);
+            // Output init
             done_mc = 0;
-            dnd = op1;
+            d_iter_c = 5'b00000;
+            d_acc_c = {32'b0, dvd}; 
+            d_next_state = PROG;
           end
-        endcase*/
+          PROG: begin
+            d_shf = (d_acc << 1);
+            cmp_res = { 1'b0, d_shf[64:32] } + dsor;
+            // Quotient shift-in and new remainder gen
+            d_shf[0] = ~cmp_res[33]; 
+            ptl_rem_n = (cmp_res[33] ? ptl_rem[31:0] : cmp_res);
+            // Output
+            done_mc = 0;
+            d_acc_c = {ptl_rem_n, d_shf[31:0]};
+            d_iter_c = d_iter - 1;
+            d_next_state = (d_iter_c ? PROG : PROG_FINAL); 
+          end
+          PROG_FINAL: begin
+            // Output
+            done_mc = 1;
+            div_result = (op[1] ? d_acc[63:32] : d_acc[31:0]);
+            // WRITEBACK: Flip sign based on inputs.
+            // Rem is same sign as dsor sign, quotient is XOR of dsor and dvd sign
+            mcalu_result = (dvd_sgn ^ (~op[1] & dsor_sgn) ? ~div_result + 1 : div_result);
+            d_next_state = (mcalu_stall ? PROG_FINAL : INIT);
+          end
+        endcase
       end
       else begin  // MUL
         casez(state)
@@ -136,28 +183,30 @@ module mcalu(
             next_state = PROG;
           end
           PROG: begin 
+            se_bit = op1[31] & (op[1] ^ op[0]);
             casez({double, single})
-              2'b?1: mpli_op = {34{neg}} ^ { {2{op1[31]&(op[1]^op[0])}}, op1}; // Sign-extend Op
-              2'b1?: mpli_op = {34{neg}} ^ {op1[31]&(op[1]^op[0]), op1, 1'b0}; 
-              default: mpli_op = {34{neg}} ^ 33'b0;
+              2'b?1: ptl_prod_i = {34{neg}} ^ { {2{se_bit}}, op1 }; // Sign-extend Op
+              2'b1?: ptl_prod_i = {34{neg}} ^ { se_bit, op1, 1'b0 }; 
+              default: ptl_prod_i = {34{neg}} ^ 33'b0;
             endcase
-            mplier = {mpli_op, 1'b0, inv};
+            ptl_prod = {ptl_prod_i, 1'b0, inv};
             acc_se = ($signed(acc) >>> 2); // Sign-extend Acc
             // Output
             done_mc = 0;
             x0_c = acc[1];
             iter_c = iter - 1;
-            acc_c = (acc_se + {mplier, 30'b0});
+            acc_c = (acc_se + {ptl_prod, 30'b0});
             inv_c = neg;
             next_state = (iter_c ? PROG : PROG_FINAL);
           end
           PROG_FINAL: begin
-            mpli_op = (x0 & ~(~op[1]&op[0]) ? {2'b0, op1} : 34'b0);
-            mplier = {mpli_op, 1'b0, inv};
+            ptl_prod_i = (x0 & ~(~op[1]&op[0]) ? {2'b0, op1} : 34'b0);
+            ptl_prod = {ptl_prod_i, 1'b0, inv};
             acc_se = ($signed(acc) >>> 2);
             // Output
             done_mc = 1;
-            mul_result = (acc_se + {mplier, 30'b0});
+            mul_result = (acc_se + {ptl_prod, 30'b0});
+            // WRITEBACK
             mcalu_result = (|op[1:0] ? mul_result[63:32] : mul_result[31:0]);
             next_state = (mcalu_stall ? PROG_FINAL : INIT);
           end
@@ -168,8 +217,10 @@ module mcalu(
 
   // Complex State machine controller
   always @(posedge clk) begin
-    if (rst | rob_flush)
+    if (rst | rob_flush) begin
       state <= INIT;
+      d_state <= INIT;
+    end
     else if (valid) begin
       // MUL Control
       state <= next_state;
@@ -178,7 +229,12 @@ module mcalu(
       iter <= iter_c;
       inv <= inv_c;
       // DIV Control
-
+      d_state <= d_next_state;
+      d_acc <= d_acc_c;
+      d_iter <= d_iter_c;
+      dsor <= dsor_c;
+      dvd_sgn <= dvd_sgn_c;
+      dsor_sgn <= dsor_sgn_c;
     end
   end
 
