@@ -221,7 +221,7 @@ module mcalu(
       state <= INIT;
       d_state <= INIT;
     end
-    else if (valid) begin
+    else if (valid & op[4]) begin
       // MUL Control
       state <= next_state;
       x0 <= x0_c;
