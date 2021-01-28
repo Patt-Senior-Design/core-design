@@ -78,4 +78,7 @@ module cpu(
   wb wb(
     /*AUTOINST*/);
 
+  l2 l2(
+    /*AUTOINST*/);
+
 endmodule
