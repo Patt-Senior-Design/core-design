@@ -60,7 +60,6 @@ module exers #(
   reg[$clog2(RS_ENTRIES)-1:0] issue_idx;
   reg issue_valid;
   reg issue_stall;
-  reg [3:0] fu_issue_q;
   reg[$clog2(RS_ENTRIES)-1:0] insert_idx;
   reg rs_full;
   reg is_sc_op;
@@ -126,16 +125,21 @@ module exers #(
     exers_scalu_op = rs_op[issue_idx];
 
     is_sc_op = (~rs_op[issue_idx][4]);
-    // NOTE: Can be modelled as issue array and stall array directly at inputs
-    fu_issue_q = {is_sc_op & (~scalu0_stall), is_sc_op & (~scalu1_stall), ~mcalu0_stall, ~mcalu1_stall};
-    casez(fu_issue_q)
-      4'b1???: {exers_scalu0_issue, exers_scalu1_issue, exers_mcalu0_issue, exers_mcalu1_issue} = 4'b1000;
-      4'b01??: {exers_scalu0_issue, exers_scalu1_issue, exers_mcalu0_issue, exers_mcalu1_issue} = 4'b0100;
-      4'b001?: {exers_scalu0_issue, exers_scalu1_issue, exers_mcalu0_issue, exers_mcalu1_issue} = 4'b0010;
-      4'b0001: {exers_scalu0_issue, exers_scalu1_issue, exers_mcalu0_issue, exers_mcalu1_issue} = 4'b0001;
-      default: {exers_scalu0_issue, exers_scalu1_issue, exers_mcalu0_issue, exers_mcalu1_issue} = 4'b0000;
-    endcase
-    issue_stall = (~| {exers_scalu0_issue, exers_scalu1_issue, exers_mcalu0_issue, exers_mcalu1_issue});
+    exers_mcalu0_issue = 0;
+    exers_mcalu1_issue = 0;
+    exers_scalu0_issue = 0;
+    exers_scalu1_issue = 0;
+    issue_stall = 0;
+    if(~mcalu0_stall)
+      exers_mcalu0_issue = issue_valid;
+    else if(~mcalu1_stall)
+      exers_mcalu1_issue = issue_valid;
+    else if(is_sc_op & ~scalu0_stall)
+      exers_scalu0_issue = issue_valid;
+    else if(is_sc_op & ~scalu1_stall)
+      exers_scalu1_issue = issue_valid;
+    else
+      issue_stall = issue_valid;
 
     {rs_full, insert_idx} = find_idx(rs_valid, 0);
 
