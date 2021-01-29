@@ -107,8 +107,8 @@ module lsq(
 
   wire rename_beat, lq_insert_beat, sq_insert_beat;
   assign rename_beat = rename_lsq_write & ~lsq_stall;
-  assign lq_insert_beat = rename_beat & ~rename_op[3];
-  assign sq_insert_beat = rename_beat & rename_op[3];
+  assign lq_insert_beat = rename_lsq_write & ~rename_op[3] & lq_insert_rdy;
+  assign sq_insert_beat = rename_lsq_write & rename_op[3] & sq_insert_rdy;
 
   integer    i;
   reg [31:2] lq_sq_addr;
@@ -159,7 +159,7 @@ module lsq(
     sq_addrgen_idx = $clog2(sq_addrgen_sel_r);
 
   // rename interface
-  assign lsq_stall = ~lq_insert_rdy | ~sq_insert_rdy;
+  assign lsq_stall = ~rename_op[3] ? ~lq_insert_rdy : ~sq_insert_rdy;
 
   // dcache interface
   assign lsq_dc_req = lq_issue_req | sq_issue_req;
