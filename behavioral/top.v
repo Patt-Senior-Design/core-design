@@ -248,6 +248,7 @@ module top();
     endcase
   endfunction
 
+  integer watchdog;
   task trace_rob_retire(
     input [6:0]  robid,
     input [6:0]  retop,
@@ -260,6 +261,8 @@ module top();
 
     reg [31:0] memaddr;
     begin
+      watchdog = 0;
+
       trace_instret = trace_instret + 1;
       if(retop[6]) begin
         trace_branches = trace_branches + 1;
@@ -309,6 +312,14 @@ module top();
       end
     end
   endtask
+
+  always @(posedge clk) begin
+    watchdog = watchdog + 1;
+    if(watchdog > 1000) begin
+      $display("\nERROR: 1000 cycles elapsed since last insn retired. Terminating.\n");
+      $finish;
+    end
+  end
 
   integer trace_cycles;
   task printstats();
