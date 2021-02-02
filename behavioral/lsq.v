@@ -22,11 +22,11 @@ module lsq(
   output [3:0]  lsq_dc_lsqid,
   output [31:0] lsq_dc_wdata,
   output        lsq_dc_flush,
-  input         dcache_ready,
-  input         dcache_valid,
-  input         dcache_error,
-  input [3:0]   dcache_lsqid,
-  input [31:0]  dcache_rdata,
+  input         dcache_lsq_ready,
+  input         dcache_lsq_valid,
+  input         dcache_lsq_error,
+  input [3:0]   dcache_lsq_lsqid,
+  input [31:0]  dcache_lsq_rdata,
 
   // writeback interface (out)
   output        lsq_wb_valid,
@@ -132,8 +132,8 @@ module lsq(
   assign sq_issue_req = sq_valid[sq_head] & sq_addr_rdy[sq_head] & sq_issue_rdy[sq_head] & ~rob_flush;
 
   wire lq_issue_beat, sq_issue_beat;
-  assign lq_issue_beat = lq_issue_req & dcache_ready;
-  assign sq_issue_beat = sq_issue_req & ~lq_issue_req & dcache_ready;
+  assign lq_issue_beat = lq_issue_req & dcache_lsq_ready;
+  assign sq_issue_beat = sq_issue_req & ~lq_issue_req & dcache_lsq_ready;
 
   wire wb_beat;
   assign wb_beat = lsq_wb_valid & ~wb_lsq_stall;
@@ -288,11 +288,11 @@ module lsq(
       if(lq_issue_beat)
         lq_issued[lq_issue_idx] <= 1;
 
-      if(dcache_valid) begin
-        lq_complete[dcache_lsqid] <= 1;
-        lq_error[dcache_lsqid] <= dcache_error;
-        lq_ecause[dcache_lsqid] <= 0; // TODO
-        lq_data[dcache_lsqid] <= dcache_rdata;
+      if(dcache_lsq_valid) begin
+        lq_complete[dcache_lsq_lsqid] <= 1;
+        lq_error[dcache_lsq_lsqid] <= dcache_lsq_error;
+        lq_ecause[dcache_lsq_lsqid] <= 0; // TODO
+        lq_data[dcache_lsq_lsqid] <= dcache_lsq_rdata;
       end
 
       if(wb_beat)

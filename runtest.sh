@@ -31,7 +31,7 @@ timeout 5 spike --log-commits --isa=RV32IM \
 SPIKEPID=$!
 
 # ignore the lines from the spike boot rom
-diff -u -I '^core   0: 3 0x000010' spiketrace simtrace > $DIFFFILE
+$DIR/checktrace.py > $DIFFFILE
 DIFFSTATUS=$?
 
 rm simtrace spiketrace
@@ -48,5 +48,10 @@ if [ $? -eq 124 ]; then
     DIFFSTATUS=1
 fi
 
-cat $DIFFFILE
+$DIR/checkmem.py $LOGFILE >> $DIFFFILE
+if [ $? -ne 0 ]; then
+    DIFFSTATUS=1
+fi
+
+head -n30 $DIFFFILE
 exit $DIFFSTATUS

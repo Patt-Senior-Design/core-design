@@ -4,6 +4,11 @@ module cpu(
 
   /*AUTOWIRE*/
 
+  wire        icache_req;
+  wire [31:6] icache_addr;
+  assign icache_req = 0;
+  assign icache_addr = 0;
+
   brpred brpred(
     /*AUTOINST*/);
 

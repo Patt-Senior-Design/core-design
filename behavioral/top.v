@@ -123,7 +123,7 @@ module top();
     end
   endtask
 
-  integer         tracefd, logfd;
+  integer tracefd, logfd;
   initial begin
     openargfile("tracefile", "w", tracefd, 0);
     openargfile("logfile", "w", logfd, 0);
@@ -296,9 +296,9 @@ module top();
       end
 
       if(logfd) begin
-        $fwrite(logfd, "%0d %x", $stime, {addr,2'b0});
+        $fwrite(logfd, "%0d ret %x", $stime, {addr,2'b0});
         if(~rd[5])
-          $fwrite(logfd, " %0d=%x", rd[4:0], result);
+          $fwrite(logfd, " x%0d=%x", rd[4:0], result);
         $fdisplay(logfd);
       end
 
@@ -320,6 +320,54 @@ module top();
       $display("Average CPI: %.3f", $itor(trace_cycles) / $itor(trace_instret));
       $display("Branch prediction accuracy: %.2f", 1.0 - ($itor(trace_mispreds) / $itor(trace_branches)));
     end
+  endtask
+
+  task log_dcache_req(
+    input [3:0]  lsqid,
+    input [3:0]  op,
+    input [31:0] addr,
+    input [31:0] wdata);
+
+    reg [3*8-1:0] mnemonic;
+    if(logfd) begin
+      case(op)
+        4'b000_0: mnemonic = "lb";
+        4'b001_0: mnemonic = "lh";
+        4'b010_0: mnemonic = "lw";
+        4'b100_0: mnemonic = "lbu";
+        4'b101_0: mnemonic = "lhu";
+        4'b000_1: mnemonic = "sb";
+        4'b001_1: mnemonic = "sh";
+        4'b010_1: mnemonic = "sw";
+        default: mnemonic = "???";
+      endcase
+      $fwrite(logfd, "%0d %0s %x", $stime, mnemonic, addr);
+      if(op[0])
+        $fwrite(logfd, " %x", wdata);
+      else
+        $fwrite(logfd, " %0d", lsqid);
+      $fdisplay(logfd);
+    end
+  endtask
+
+  task log_dcache_resp(
+    input [3:0]  lsqid,
+    input        error,
+    input [31:0] rdata);
+
+    if(logfd) begin
+      $fwrite(logfd, "%0d resp %0d", $stime, lsqid);
+      if(error)
+        $fwrite(logfd, " error");
+      else
+        $fwrite(logfd, " %x", rdata);
+      $fdisplay(logfd);
+    end
+  endtask
+
+  task log_rob_flush();
+    if(logfd)
+      $fdisplay(logfd, "%0d flush", $stime);
   endtask
 
 endmodule
