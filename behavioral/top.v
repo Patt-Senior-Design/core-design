@@ -290,6 +290,12 @@ module top();
                 default: // word write
                   $fwrite(tracefd, " 0x%x", trace_memdata[robid]);
               endcase
+            else if(trace_memop[robid][1:0] == 2'b11) begin
+              // lbcmp makes multiple sequential accesses
+              $fwrite(tracefd, " mem 0x%x", memaddr+8);
+              $fwrite(tracefd, " mem 0x%x", memaddr+16);
+              $fwrite(tracefd, " mem 0x%x", memaddr+24);
+            end
           end
           if(trace_writes_csr[robid])
             $fwrite(tracefd, " c%0d_%0s 0x%x", trace_membase[robid],
