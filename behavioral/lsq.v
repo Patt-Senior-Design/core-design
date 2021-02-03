@@ -63,6 +63,9 @@ module lsq(
   reg [31:0]  lq_imm [0:15];
   reg [31:0]  lq_addr [0:15];
   reg [31:0]  lq_data [0:15];
+  // used for lbcmp
+  reg [15:0]  lq_op2_rdy;
+  reg [7:0]   lq_op2 [0:15];
 
   // store queue
   reg [15:0]  sq_valid;
@@ -110,21 +113,39 @@ module lsq(
   assign lq_insert_beat = rename_lsq_write & ~rename_op[3] & lq_insert_rdy;
   assign sq_insert_beat = rename_lsq_write & rename_op[3] & sq_insert_rdy;
 
+  // lq_sq_wide: enables 32-byte blocks for addr comparison
   integer    i;
   reg [31:2] lq_sq_addr;
+  reg        lq_sq_wide;
   reg        lq_sq_hit;
   always @(*) begin
+    // generate lq_sq_addr, lq_sq_wide
     lq_sq_addr = 0;
+    lq_sq_wide = 0;
     for(i = 0; i < 16; i=i+1)
-      if(lq_issue_sel[i])
+      if(lq_issue_sel[i]) begin
         lq_sq_addr = lq_sq_addr | lq_addr[i][31:2];
-
-    lq_sq_hit = 0;
-    for(i = 0; i < 16; i=i+1)
-      if(lq_sq_sel[i] & sq_valid[i] & (~sq_addr_rdy[i] | (sq_addr[i][31:2] == lq_sq_addr))) begin
-        lq_sq_hit = 1;
-        i = 16;
+        lq_sq_wide = lq_sq_wide | (&lq_type[i][1:0]);
       end
+
+    // check sq entries for conflicting addresses
+    lq_sq_hit = 0;
+    for(i = 0; i < 16; i=i+1) begin
+      if(lq_sq_sel[i] & sq_valid[i]) begin
+        // any stores with unresolved address?
+        if(~sq_addr_rdy[i])
+          lq_sq_hit = 1;
+
+        // any stores with conflicting address?
+        if(sq_addr[i][31:5] == lq_sq_addr[31:5])
+          if(lq_sq_wide | (sq_addr[i][4:2] == lq_sq_addr[4:2]))
+            lq_sq_hit = 1;
+      end
+
+      // terminate loop if we found a hit
+      if(lq_sq_hit)
+        i = 16;
+    end
   end
 
   wire lq_issue_req, sq_issue_req;
@@ -166,7 +187,7 @@ module lsq(
   assign lsq_dc_op = lq_issue_req ? {lq_type[lq_issue_idx],1'b0} : {sq_type[sq_head],1'b1};
   assign lsq_dc_addr = lq_issue_req ? lq_addr[lq_issue_idx] : sq_addr[sq_head];
   assign lsq_dc_lsqid = lq_issue_idx;
-  assign lsq_dc_wdata = sq_data[sq_head];
+  assign lsq_dc_wdata = lq_issue_req ? lq_op2[lq_issue_idx] : sq_data[sq_head];
   assign lsq_dc_flush = rob_flush;
 
   // writeback interface (out)
@@ -278,6 +299,8 @@ module lsq(
         lq_rd[lq_insert_idx] <= rename_rd[4:0];
         lq_base[lq_insert_idx] <= rename_op1;
         lq_imm[lq_insert_idx] <= rename_imm;
+        lq_op2_rdy[lq_insert_idx] <= (~&rename_op[2:1]) | rename_op2ready;
+        lq_op2[lq_insert_idx] <= rename_op2[7:0];
       end
 
       if(lq_addrgen_req_r) begin
@@ -299,7 +322,7 @@ module lsq(
         lq_valid[lq_remove_idx] <= 0;
 
       if(wb_valid & ~wb_error)
-        for(j = 0; j < 16; j=j+1)
+        for(j = 0; j < 16; j=j+1) begin
           if(lq_valid[j] & ~lq_base_rdy[j] & (lq_base[j][6:0] == wb_robid)) begin
             lq_base_rdy[j] <= 1;
             lq_base[j] <= wb_result;
@@ -308,6 +331,12 @@ module lsq(
               {1'b0,j[3:0]},
               wb_result);
           end
+
+          if(lq_valid[j] & ~lq_op2_rdy[j] & (lq_op2[j][6:0] == wb_robid)) begin
+            lq_op2_rdy[j] <= 1;
+            lq_op2[j] <= wb_result[7:0];
+          end
+        end
     end
 
   // store queue

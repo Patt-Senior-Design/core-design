@@ -24,10 +24,7 @@ timeout 5 $DIR/behavioral/build/top +memfile=$HEXFILE +tracefile=simtrace +logfi
 SIMPID=$!
 
 mkfifo spiketrace
-timeout 5 spike --log-commits --isa=RV32IM \
-        -m0x10000000:0x10000,0x20000000:0x400000,0x30000000:0x1000 \
-        --extlib="$DIR/plugins/uart.so" --device=uart,0x30010000 \
-        $ELFFILE 2> spiketrace &
+timeout 5 $DIR/runspike.sh --log-commits $ELFFILE 2> spiketrace &
 SPIKEPID=$!
 
 # ignore the lines from the spike boot rom

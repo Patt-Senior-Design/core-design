@@ -339,9 +339,9 @@ module top();
     input [31:0] addr,
     input [31:0] wdata);
 
-    reg [3*8-1:0] mnemonic;
+    reg [5*8-1:0] mnemonic;
     if(logfd) begin
-      case(op)
+      casez(op)
         4'b000_0: mnemonic = "lb";
         4'b001_0: mnemonic = "lh";
         4'b010_0: mnemonic = "lw";
@@ -350,13 +350,17 @@ module top();
         4'b000_1: mnemonic = "sb";
         4'b001_1: mnemonic = "sh";
         4'b010_1: mnemonic = "sw";
+        4'b?11_0: mnemonic = "lbcmp";
         default: mnemonic = "???";
       endcase
       $fwrite(logfd, "%0d %0s %x", $stime, mnemonic, addr);
       if(op[0])
         $fwrite(logfd, " %x", wdata);
-      else
+      else begin
+        if(mnemonic == "lbcmp")
+          $fwrite(logfd, " %2x", wdata[7:0]);
         $fwrite(logfd, " %0d", lsqid);
+      end
       $fdisplay(logfd);
     end
   endtask

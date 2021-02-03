@@ -102,6 +102,9 @@ module dcache(
   reg [3:0]  s0_lsqid_r;
   reg [31:0] s0_wdata_r;
 
+  // cycle counter for burst transactions (lbcmp)
+  reg [1:0]  s0_cycle_r;
+
   // stage 0 signals
   reg        s0_stall;
 
@@ -130,6 +133,11 @@ module dcache(
   reg [3:0]  s0_wmask;
   reg [31:0] s0_wdata_aligned;
 
+  // beat transaction signals (lbcmp)
+  wire [2:0] s0_op;
+  wire       s0_burst;
+  wire       s0_last;
+
   // stage 1 latches
   // datamem read port
   reg        s1_req_r;
@@ -145,6 +153,7 @@ module dcache(
   reg [3:1]  s1_op_r;
   reg [3:0]  s1_lsqid_r;
   reg [2:0]  s1_offset_r;
+  reg [7:0]  s1_op2_r;
 
   // forwarding latches (resp data from rbuf rather than datamem)
   // TODO can likely be factored out
@@ -153,6 +162,7 @@ module dcache(
   reg [4:0]  s1_rbuf_raddr_r;
   reg [3:0]  s1_rbuf_fwd_lsqid_r;
   reg [2:0]  s1_rbuf_fwd_offset_r;
+  reg [7:0]  s1_rbuf_fwd_op2_r;
 
   // stage 1 signals
   wire       s1_stall;
@@ -173,9 +183,18 @@ module dcache(
   reg [3:1]  s2_op_r;
   reg [3:0]  s2_lsqid_r;
   reg [2:0]  s2_offset_r;
+  reg [7:0]  s2_op2_r;
   reg [63:0] s2_rdata_r;
 
+  // shift register holding intermediate results during lbcmp (burst)
+  reg [23:0] s2_bcmp_r;
+
   // stage 2 signals
+  wire       s2_burst;
+  wire       s2_last;
+
+  reg [7:0]  s2_bcmp_result;
+
   // encoded from rdata and op (lw/lh/lb/lhu/lbu)
   reg [31:0] s2_rdata_muxed;
   reg [31:0] s2_rdata_aligned;
@@ -199,10 +218,10 @@ module dcache(
 
   // lsq interface
   assign dcache_lsq_ready = ~s0_stall;
-  assign dcache_lsq_valid = s2_req_r & ~lsq_dc_flush;
+  assign dcache_lsq_valid = s2_req_r & s2_last & ~lsq_dc_flush;
   assign dcache_lsq_error = 0;
   assign dcache_lsq_lsqid = s2_lsqid_r;
-  assign dcache_lsq_rdata = s2_rdata_extended;
+  assign dcache_lsq_rdata = s2_burst ? {s2_bcmp_result,s2_bcmp_r} : s2_rdata_extended;
 
   // l2 interface
   assign dcache_l2_ready = ~&l2req_fwd_valid;
@@ -272,7 +291,8 @@ module dcache(
         s0_rd_forward = 1;
       else
         // merge into the mshr if the slot is free and there hasn't been a flush
-        s0_rd_merge = ~l2_dc_valid & ~rbuf_started & ~mshr_req_valid[s0_addr_r[5:2]] & ~mshr_obsolete;
+        s0_rd_merge = ~l2_dc_valid & ~rbuf_started & ~mshr_req_valid[s0_addr_r[5:2]] &
+                      ~mshr_obsolete & ~s0_burst;
 
     // can we merge a write?
     s0_wr_merge = s0_op_r[0] & s0_mshrhit & ~rbuf_filled[s0_addr_r[5:3]];
@@ -304,7 +324,9 @@ module dcache(
   always @(*) begin
     s0_stall = 0;
     if(s0_req_r)
-      if(~s0_op_r[0])
+      if(s0_burst & ~s0_last)
+        s0_stall = 1;
+      else if(~s0_op_r[0])
         if(s0_mshrhit)
           s0_stall = (~s0_rd_forward | s1_rbuf_fwd_stall) & ~s0_rd_merge;
         else if(s0_tagmiss)
@@ -314,6 +336,8 @@ module dcache(
       else
         s0_stall = ~l2_dc_ready | (s0_mshrhit & ~s0_wr_merge);
   end
+
+  assign s0_op = s0_burst ? {s0_last,2'b11} : s0_op_r[3:1];
 
   wire s0_wen;
   assign s0_wen = s0_req_r & s0_op_r[0] & (~s0_tagmiss | (s0_mshrhit & ~rbuf_filled[s0_addr_r[5:3]]));
@@ -336,6 +360,20 @@ module dcache(
       end
     endcase
 
+  // beat transaction signals
+  assign s0_burst = (s0_op_r[2:0] == 3'b110);
+  assign s0_last = ~s0_burst | (&s0_cycle_r);
+
+  // s0_cycle_r
+  always @(posedge clk)
+    if(rst)
+      s0_cycle_r <= 0;
+    else if(s0_req_r & s0_burst & ((s0_rd_forward & ~s1_rbuf_fwd_stall) | (~s0_mshrhit & ~s0_tagmiss & ~s1_stall))) begin
+      s0_cycle_r <= s0_cycle_r + 1;
+      if(~s0_last)
+        s0_addr_r <= s0_addr_r + 8;
+    end
+
   // s1 input latches
   always @(posedge clk)
     if(rst) begin
@@ -344,9 +382,10 @@ module dcache(
     end else if(~s1_stall) begin
       s1_req_r <= s0_req_r & ~s0_op_r[0] & ~s0_mshrhit & ~s0_tagmiss & ~lsq_dc_flush;
       s1_offset_r <= s0_addr_r[2:0];
-      s1_op_r <= s0_op_r[3:1];
+      s1_op_r <= s0_op;
       s1_lsqid_r <= s0_lsqid_r;
       s1_raddr_r <= {s0_set,oh2idx(s0_taghits),s0_addr_r[5:3]};
+      s1_op2_r <= s0_wdata_r[7:0];
       if(s0_wen) begin
         s1_wen_r <= 1;
         s1_waddr_r <= {s0_set,oh2idx(s0_taghits),s0_addr_r[5:3]};
@@ -367,8 +406,9 @@ module dcache(
     else if(~s1_rbuf_fwd_stall) begin
       s1_rbuf_fwd_r <= s0_req_r & s0_rd_forward;
       s1_rbuf_fwd_offset_r <= s0_addr_r[2:0];
-      s1_rbuf_fwd_op_r <= s0_op_r[3:1];
+      s1_rbuf_fwd_op_r <= s0_op;
       s1_rbuf_fwd_lsqid_r <= s0_lsqid_r;
+      s1_rbuf_fwd_op2_r <= s0_wdata_r[7:0];
       s1_rbuf_raddr_r <= s0_addr_r[5:3];
     end
 
@@ -403,16 +443,32 @@ module dcache(
         s2_offset_r <= s1_rbuf_fwd_offset_r;
         s2_lsqid_r <= s1_rbuf_fwd_lsqid_r;
         s2_op_r <= s1_rbuf_fwd_op_r;
+        s2_op2_r <= s1_rbuf_fwd_op2_r;
         s2_rdata_r <= rbuf_data[s1_rbuf_raddr_r];
       end else if(s1_req_r) begin
         s2_req_r <= 1;
         s2_offset_r <= s1_offset_r;
         s2_lsqid_r <= s1_lsqid_r;
         s2_op_r <= s1_op_r;
+        s2_op2_r <= s1_op2_r;
         s2_rdata_r <= datamem[s1_raddr_r];
       end else
         s2_req_r <= 0;
     end
+
+  // s2_bcmp_r
+  always @(posedge clk)
+    if(s2_req_r & s2_burst)
+      s2_bcmp_r <= {s2_bcmp_result,s2_bcmp_r[23:8]};
+
+  assign s2_burst = &s2_op_r[2:1];
+  assign s2_last = ~s2_burst | s2_op_r[3];
+
+  // s2_bcmp_result
+  integer l;
+  always @(*)
+    for(l = 0; l < 8; l=l+1)
+      s2_bcmp_result[l] = s2_rdata_r[l*8+:8] == s2_op2_r;
 
   // s2_rdata_*
   always @(*) begin
@@ -478,7 +534,7 @@ module dcache(
         mshr_obsolete <= 0;
         mshr_addr <= s0_addr_r[31:6];
         mshr_way <= s0_mshr_alloc_way;
-        mshr_req_valid <= (1 << s0_addr_r[5:2]);
+        mshr_req_valid <= ~s0_burst ? (1 << s0_addr_r[5:2]) : 0;
         mshr_req_offset[s0_addr_r[5:2]*2+:2] <= s0_addr_r[1:0];
         mshr_req_op[s0_addr_r[5:2]*3+:3] <= s0_op_r[3:1];
         mshr_req_lsqid[s0_addr_r[5:2]*4+:4] <= s0_lsqid_r;

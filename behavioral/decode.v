@@ -99,11 +99,12 @@ module decode(
   wire [2:0] funct3;
   assign funct3 = insn[14:12];
 
-  wire insn_load, insn_jalr, insn_auipc, insn_csr;
+  wire insn_load, insn_jalr, insn_auipc, insn_csr, insn_lbcmp;
   assign insn_load = (insn[6:2] == OPC_LOAD);
   assign insn_jalr = (insn[6:2] == OPC_JALR);
   assign insn_auipc = (insn[6:2] == OPC_AUIPC);
   assign insn_csr = (insn[6:2] == OPC_SYSTEM) & (funct3[1:0] != 0);
+  assign insn_lbcmp = (insn[6:2] == OPC_CUSTOM0) & (funct3[1:0] == 2'b11);
 
   wire insn_complex;
   assign insn_complex = fmt_r & insn[25];
@@ -156,7 +157,7 @@ module decode(
   assign decode_uses_rs1 = uses_rs1;
   assign decode_uses_rs2 = uses_rs2;
   assign decode_uses_imm = ~fmt_r & ~fmt_b;
-  assign decode_uses_memory = insn_load | fmt_s;
+  assign decode_uses_memory = insn_load | fmt_s | insn_lbcmp;
   assign decode_uses_pc = fmt_j | insn_auipc;
   assign decode_csr_access = insn_csr;
   assign decode_inhibit = insn_jalr;
@@ -202,6 +203,8 @@ module decode(
       OPC_MISCMEM: fmt_i = 1;
       OPC_SYSTEM: fmt_i = 1;
 
+      OPC_CUSTOM0: fmt_r = 1;
+
       // unimplemented opcodes
       // floating point
       OPC_OPFP: fmt_inv = 1;
@@ -220,7 +223,6 @@ module decode(
       OPC_OPIMM32: fmt_inv = 1;
 
       // custom instructions
-      OPC_CUSTOM0: fmt_inv = 1;
       OPC_CUSTOM1: fmt_inv = 1;
       OPC_CUSTOM2: fmt_inv = 1;
       OPC_CUSTOM3: fmt_inv = 1;
@@ -245,6 +247,7 @@ module decode(
       fmt_b: imm = $signed({insn[31],insn[7],insn[30:25],insn[11:8],1'b0});
       fmt_u: imm = {insn[31:12],12'b0};
       fmt_j: imm = $signed({insn[31],insn[19:12],insn[20],insn[30:21],1'b0});
+      default: imm = 0;
     endcase
   end
 

@@ -2,19 +2,20 @@
 
 import sys
 
-RAMBASE = 0x20000000
-RAMSIZE = 0x400000
+RAMBASE = 0x20000000//4
+RAMSIZE = 0x400000//4
 
 # two categories of entry:
-# 1. read (lw/lh/lb/lhu/lbu)
+# 1. read (lw/lh/lb/lhu/lbu/lbcmp)
 # 2. write (sw/sh/sb)
 class MemoryEntry:
-    def __init__(self, line: int, time: int, category: str, addr: int, value: int = None):
+    def __init__(self, line: int, time: int, category: str, addr: int, wdata: int = None):
         self.line = line
         self.time = time
         self.category = category
         self.addr = addr
-        self.value = value
+        self.rdata = None
+        self.wdata = wdata
 
 def getLoadResult(entry: MemoryEntry, memValue: int) -> int:
     memValue >>= (entry.addr & 3) * 8
@@ -30,7 +31,7 @@ def getLoadResult(entry: MemoryEntry, memValue: int) -> int:
 
 def getStoreResult(entry: MemoryEntry, memValue: int) -> int:
     shift = (entry.addr & 3) * 8
-    regValue = entry.value << shift
+    regValue = entry.wdata << shift
     if entry.category == "sw":
         return regValue
     if entry.category == "sh":
@@ -41,8 +42,18 @@ def getStoreResult(entry: MemoryEntry, memValue: int) -> int:
         return (memValue & ~mask) | (regValue & mask)
     return None
 
+def getCmpResult(entry: MemoryEntry, ram: list) -> int:
+    base = (entry.addr // 4) & ~1
+    byte = entry.wdata & 0xff
+    result = 0
+    for i in range(8):
+        word = ram[base-RAMBASE]
+        for j in range(2):
+            result = (result >> 1) | (0x80000000 if ((word & 0xff) == byte) else 0)
+            word >>= 8
+    return result
+
 class MemoryTrace:
-    RAMBASE = 0x20000000
     def __init__(self, logfile: str):
         self.logfile = logfile
     def parse(self) -> bool:
@@ -56,34 +67,39 @@ class MemoryTrace:
                 time = int(fields[0])
                 category = fields[1]
                 if category[0] == "l":
-                    # lw/lh/lb/lhu/lbu (read request)
+                    # lw/lh/lb/lhu/lbu/lbcmp (read request)
                     addr = int(fields[2], 16)
-                    lsqid = int(fields[3])
+                    if category == "lbcmp":
+                        op2 = int(fields[3], 16)
+                        lsqid = int(fields[4])
+                    else:
+                        op2 = None
+                        lsqid = int(fields[3])
                     lsqids[lsqid] = len(self.entries)
-                    self.entries.append(MemoryEntry(linenum, time, category, addr))
-                    if (category[1] == "h" and (addr & 1)) or (category[1] == "w" and (addr & 3)):
-                        print("WARN: misaligned load at line {} ({}ns)".format(linenum, time))
+                    self.entries.append(MemoryEntry(linenum, time, category, addr, op2))
+                    if (category[1] == "h" and (addr & 1)) or (category[1] == "w" and (addr & 3)) or (category == "lbcmp" and (addr & 7)):
+                        print("WARN: misaligned {} at line {} ({}ns)".format(category, linenum, time))
                 elif category[0] == "s":
                     # sw/sh/sb (write)
                     addr = int(fields[2], 16)
-                    value = int(fields[3], 16)
-                    self.entries.append(MemoryEntry(linenum, time, category, addr, value))
+                    wdata = int(fields[3], 16)
+                    self.entries.append(MemoryEntry(linenum, time, category, addr, wdata))
                     if (category[1] == "h" and (addr & 1)) or (category[1] == "w" and (addr & 3)):
-                        print("WARN: misaligned store at line {} ({}ns)".format(linenum, time))
+                        print("WARN: misaligned {} at line {} ({}ns)".format(category, linenum, time))
                 elif category == "resp":
                     # read response
                     lsqid = int(fields[2])
-                    value = int(fields[3], 16)
+                    rdata = int(fields[3], 16)
                     if lsqids[lsqid] is None:
                         print("FAIL checkmem at line {} ({}ns): orphaned response".format(linenum, time))
                         success = False
                     else:
-                        self.entries[lsqids[lsqid]].value = value
+                        self.entries[lsqids[lsqid]].rdata = rdata
                         lsqids[lsqid] = None
                 elif category == "flush":
                     for index in lsqids:
                         if index is not None:
-                            self.entries[index].value = "<flushed>"
+                            self.entries[index].rdata = "<flushed>"
                     lsqids = [None] * 16
                 linenum += 1
         for index in lsqids:
@@ -93,21 +109,24 @@ class MemoryTrace:
                 success = False
         return success
     def check(self) -> tuple:
-        memory = [0] * (RAMSIZE//4)
+        memory = [0] * RAMSIZE
         for entry in self.entries:
             if entry.category[0] == "l":
-                if entry.value == "<flushed>":
+                if entry.rdata == "<flushed>":
                     continue
-                memAddr = (entry.addr - RAMBASE) // 4
+                memAddr = (entry.addr // 4) - RAMBASE
                 if memAddr < 0 or memAddr >= len(memory):
                     #print("WARN: not checking line {}, addr {:08x} not in RAM".format(entry.line, entry.addr))
                     continue
                 memValue = memory[memAddr]
-                result = getLoadResult(entry, memValue)
-                if entry.value != result:
+                if entry.category == "lbcmp":
+                    result = getCmpResult(entry, memory)
+                else:
+                    result = getLoadResult(entry, memValue)
+                if entry.rdata != result:
                     return (entry,result)
             elif entry.category[0] == "s":
-                memAddr = (entry.addr - RAMBASE) // 4
+                memAddr = (entry.addr // 4) - RAMBASE
                 if memAddr < 0 or memAddr >= len(memory):
                     #print("WARN: not checking line {}, addr {:08x} not in RAM".format(entry.line, entry.addr))
                     continue
@@ -125,8 +144,8 @@ def main() -> int:
     mismatch = memtrace.check()
     if mismatch:
         entry = mismatch[0]
-        if entry.value is not None:
-            gotVal = "{:08x}".format(entry.value)
+        if entry.rdata is not None:
+            gotVal = "{:08x}".format(entry.rdata)
         else:
             gotVal = "<no response>"
         expectedVal = mismatch[1]
