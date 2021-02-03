@@ -125,8 +125,8 @@ module dcache(
   reg        s0_rd_merge;
   reg        s0_wr_merge;
   wire       s0_mshr_alloc;
-  wire       invalid_way_avail;
-  wire [3:0] invalid_way_sel;
+  wire       s0_invalid_way_avail;
+  wire [3:0] s0_invalid_way_sel;
   reg [3:0]  s0_mshr_alloc_way;
 
   // decoded from wdata and op (sw/sh/sb)
@@ -137,6 +137,7 @@ module dcache(
   wire [2:0] s0_op;
   wire       s0_burst;
   wire       s0_last;
+  wire       s0_burst_beat;
 
   // stage 1 latches
   // datamem read port
@@ -149,20 +150,12 @@ module dcache(
   reg [7:0]  s1_wmask_r;
   reg [63:0] s1_wdata_r;
 
-  // latched to send to stage 2
+  // forwarding (resp data from rbuf rather than datamem)
+  reg        s1_forward_r;
   reg [3:1]  s1_op_r;
   reg [3:0]  s1_lsqid_r;
   reg [2:0]  s1_offset_r;
   reg [7:0]  s1_op2_r;
-
-  // forwarding latches (resp data from rbuf rather than datamem)
-  // TODO can likely be factored out
-  reg        s1_rbuf_fwd_r;
-  reg [2:0]  s1_rbuf_fwd_op_r;
-  reg [4:0]  s1_rbuf_raddr_r;
-  reg [3:0]  s1_rbuf_fwd_lsqid_r;
-  reg [2:0]  s1_rbuf_fwd_offset_r;
-  reg [7:0]  s1_rbuf_fwd_op2_r;
 
   // stage 1 signals
   wire       s1_stall;
@@ -177,8 +170,8 @@ module dcache(
   // four possible inputs, in priority order:
   // 1. forwarding directly from l2_dc_rdata (lower 32 bits)
   // 2. forwarding directly from l2_dc_rdata (upper 32 bits)
-  // 3. forwarding from rbuf (s0_rd_forward, s1_rbuf_fwd_*)
-  // 4. datamem read
+  // 3. forwarding from rbuf (s1_forward_r)
+  // 4. datamem read (s1_req_r)
   reg        s2_req_r;
   reg [3:1]  s2_op_r;
   reg [3:0]  s2_lsqid_r;
@@ -212,9 +205,7 @@ module dcache(
   assign l2req_fwd_valid = mshr_obsolete ? 0 : mshr_req_valid[1:0];
 
   // must stall when there is a higher priority input to stage 2 present
-  wire s1_rbuf_fwd_stall;
-  assign s1_rbuf_fwd_stall = s1_rbuf_fwd_r & l2_dc_valid & (|l2req_fwd_valid);
-  assign s1_stall = s1_req_r & ((l2_dc_valid & (|l2req_fwd_valid)) | s1_rbuf_fwd_r);
+  assign s1_stall = s1_req_r & l2_dc_valid & (|l2req_fwd_valid);
 
   // lsq interface
   assign dcache_lsq_ready = ~s0_stall;
@@ -235,7 +226,7 @@ module dcache(
   always @(posedge clk)
     if(rst | (lsq_dc_flush & ~s0_op_r[0]))
       s0_req_r <= 0;
-    else if(dcache_lsq_ready) begin
+    else  if(~s0_stall) begin
       s0_req_r <= lsq_dc_req;
       if(lsq_dc_req) begin
         s0_op_r <= lsq_dc_op;
@@ -243,7 +234,8 @@ module dcache(
         s0_lsqid_r <= lsq_dc_lsqid;
         s0_wdata_r <= lsq_dc_wdata;
       end
-    end
+    end else if(s0_burst_beat)
+      s0_addr_r <= s0_addr_r + 8;
 
   // tagmem read and compare
   integer i;
@@ -303,14 +295,14 @@ module dcache(
   // invalid_way_*
   priarb #(4) invalid_way_arb(
     .req(~s0_tagmem_valid),
-    .grant_valid(invalid_way_avail),
-    .grant(invalid_way_sel));
+    .grant_valid(s0_invalid_way_avail),
+    .grant(s0_invalid_way_sel));
 
   // s0_mshr_alloc_way
   always @(*)
     // if there are any invalid ways, use those instead of lru bits
-    if(invalid_way_avail)
-      s0_mshr_alloc_way = invalid_way_sel;
+    if(s0_invalid_way_avail)
+       s0_mshr_alloc_way = s0_invalid_way_sel;
     else
       // compute lru way
       casez(s0_tagmem_lru)
@@ -328,7 +320,7 @@ module dcache(
         s0_stall = 1;
       else if(~s0_op_r[0])
         if(s0_mshrhit)
-          s0_stall = (~s0_rd_forward | s1_rbuf_fwd_stall) & ~s0_rd_merge;
+          s0_stall = (~s0_rd_forward | s1_stall) & ~s0_rd_merge;
         else if(s0_tagmiss)
           s0_stall = mshr_valid;
         else
@@ -363,16 +355,14 @@ module dcache(
   // beat transaction signals
   assign s0_burst = (s0_op_r[2:0] == 3'b110);
   assign s0_last = ~s0_burst | (&s0_cycle_r);
+  assign s0_burst_beat = s0_req_r & s0_burst & (s0_rd_forward | (~s0_mshrhit & ~s0_tagmiss)) & ~s1_stall;
 
   // s0_cycle_r
   always @(posedge clk)
     if(rst)
       s0_cycle_r <= 0;
-    else if(s0_req_r & s0_burst & ((s0_rd_forward & ~s1_rbuf_fwd_stall) | (~s0_mshrhit & ~s0_tagmiss & ~s1_stall))) begin
+    else if(s0_burst_beat)
       s0_cycle_r <= s0_cycle_r + 1;
-      if(~s0_last)
-        s0_addr_r <= s0_addr_r + 8;
-    end
 
   // s1 input latches
   always @(posedge clk)
@@ -381,6 +371,7 @@ module dcache(
       s1_wen_r <= 0;
     end else if(~s1_stall) begin
       s1_req_r <= s0_req_r & ~s0_op_r[0] & ~s0_mshrhit & ~s0_tagmiss & ~lsq_dc_flush;
+      s1_forward_r <= s0_req_r & s0_rd_forward & ~lsq_dc_flush;
       s1_offset_r <= s0_addr_r[2:0];
       s1_op_r <= s0_op;
       s1_lsqid_r <= s0_lsqid_r;
@@ -397,19 +388,6 @@ module dcache(
         s1_wmask_r <= ~mshr_wmask[rbuf_head[2:0]*8+:8];
         s1_wdata_r <= fill_data;
       end
-    end
-
-  // s1_rbuf_fwd_*
-  always @(posedge clk)
-    if(rst | lsq_dc_flush)
-      s1_rbuf_fwd_r <= 0;
-    else if(~s1_rbuf_fwd_stall) begin
-      s1_rbuf_fwd_r <= s0_req_r & s0_rd_forward;
-      s1_rbuf_fwd_offset_r <= s0_addr_r[2:0];
-      s1_rbuf_fwd_op_r <= s0_op;
-      s1_rbuf_fwd_lsqid_r <= s0_lsqid_r;
-      s1_rbuf_fwd_op2_r <= s0_wdata_r[7:0];
-      s1_rbuf_raddr_r <= s0_addr_r[5:3];
     end
 
   // fill_*
@@ -438,20 +416,13 @@ module dcache(
         s2_lsqid_r <= mshr_req_lsqid[7:4];
         s2_op_r <= mshr_req_op[5:3];
         s2_rdata_r <= l2_dc_rdata;
-      end else if(s1_rbuf_fwd_r) begin
-        s2_req_r <= 1;
-        s2_offset_r <= s1_rbuf_fwd_offset_r;
-        s2_lsqid_r <= s1_rbuf_fwd_lsqid_r;
-        s2_op_r <= s1_rbuf_fwd_op_r;
-        s2_op2_r <= s1_rbuf_fwd_op2_r;
-        s2_rdata_r <= rbuf_data[s1_rbuf_raddr_r];
-      end else if(s1_req_r) begin
+      end else if(s1_forward_r | s1_req_r) begin
         s2_req_r <= 1;
         s2_offset_r <= s1_offset_r;
         s2_lsqid_r <= s1_lsqid_r;
         s2_op_r <= s1_op_r;
         s2_op2_r <= s1_op2_r;
-        s2_rdata_r <= datamem[s1_raddr_r];
+        s2_rdata_r <= s1_forward_r ? rbuf_data[s1_raddr_r[2:0]] : datamem[s1_raddr_r];
       end else
         s2_req_r <= 0;
     end
