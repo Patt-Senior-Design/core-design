@@ -24,12 +24,26 @@ module scalu(
   // rob interface
   input         rob_flush);
 
+  function automatic [4:0] compute_priority_vector (input[31:0] vector);
+    integer j;
+    begin
+      for (j = 0; j < RS_ENTRIES; j=j+1)
+        if (vector[j] == 1) begin
+          priority_vector = (1 << j);
+          j = RS_ENTRIES;
+        end
+    end
+  endfunction
+  
   reg valid;
   reg[4:0] op;
   reg[6:0] robid;
   reg[5:0] rd;
   reg[31:0] op1;
   reg[31:0] op2;
+
+  reg[31:0] p_vector;
+  reg[4:0] p_index;
 
   always @(posedge clk) begin
     if (rst | rob_flush) begin
@@ -47,28 +61,39 @@ module scalu(
     end
   end
 
-  assign scalu_stall = valid & wb_scalu_stall;
 
+  assign scalu_stall = valid & wb_scalu_stall;
   assign scalu_valid = valid;
   assign scalu_robid = robid;
   assign scalu_rd = rd;
-  // Error TBD
   assign scalu_error = 0;
   assign scalu_ecause = 0;
-  // JAL/R TBD
+
   always @(*) begin
-    casez(op[2:0])
-      3'b000: scalu_result = (op[3] ? op1 + (~op2+1) : op1 + op2); // ADD,SUB
-      3'b001: scalu_result = (op1 << op2[4:0]); // SLL
-      3'b010: scalu_result = ($signed(op1) < $signed(op2)); // SLT
-      3'b011: scalu_result = (op1 < op2); // SLTU
-      3'b100: scalu_result = (op[3] ? (op1 == op2) : (op1 ^ op2)); // XOR, SEQ
-      3'b101: scalu_result = (op[3] ? $signed($signed(op1) >>> op2[4:0]) : (op1 >> op2[4:0])); // SRL, SRA
-      3'b110: scalu_result = (op1 | op2);
-      3'b111: scalu_result = (op1 & op2);
-      default: scalu_result = 32'bx;
-    endcase
-  end
+    if (op[4]) begin
+      casez(op[2:0])
+        3'b000: scalu_result = (op[3] ? op1 + (~op2+1) : op1 + op2); // ADD,SUB
+        3'b001: scalu_result = (op1 << op2[4:0]); // SLL
+        3'b010: scalu_result = ($signed(op1) < $signed(op2)); // SLT
+        3'b011: scalu_result = (op1 < op2); // SLTU
+        3'b100: scalu_result = (op[3] ? (op1 == op2) : (op1 ^ op2)); // XOR, SEQ
+        3'b101: scalu_result = (op[3] ? $signed($signed(op1) >>> op2[4:0]) : (op1 >> op2[4:0])); // SRL, SRA
+        3'b110: scalu_result = (op1 | op2);
+        3'b111: scalu_result = (op1 & op2);
+        default: scalu_result = 32'bx;
+      endcase
+    end
+    // ALU Extensions
+    else begin
+      p_vector = compute_priority_vector(op1 & ~op2);
+      p_index = $clog2(p_vector);
+      casez(op[2:0])
+        // Priority Find: Encoder
+        3'b000: scalu_result = {{27{~|p_vector}} , p_index};
+        // Priority Clear
+        3'b001: scalu_result = op1 ^ p_vector;
+        default: scalu_result = 32'bx;
+    end
 
 
 endmodule
