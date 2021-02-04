@@ -124,7 +124,7 @@ module exers #(
     exers_mcalu_op = rs_op[issue_idx];
     exers_scalu_op = rs_op[issue_idx];
 
-    is_sc_op = (~rs_op[issue_idx][4]);
+    is_sc_op = (~&rs_op[issue_idx][4:3]);
     exers_mcalu0_issue = 0;
     exers_mcalu1_issue = 0;
     exers_scalu0_issue = 0;

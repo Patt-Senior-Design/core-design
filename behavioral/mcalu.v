@@ -38,7 +38,10 @@ module mcalu(
   reg[31:0] op1;
   reg[31:0] op2;
   
-  assign done = op[4] ? done_mc : done_sc;
+  wire is_mc_op;
+  assign is_mc_op = op[4] & op[3];
+
+  assign done = is_mc_op ? done_mc : done_sc;
   assign mcalu_stall = (valid & (~done)) | (valid & done & wb_mcalu_stall);
   assign mcalu_valid = done;
   assign mcalu_robid = robid;
@@ -51,7 +54,7 @@ module mcalu(
   always @(posedge clk) begin
     if (rst | rob_flush) begin
       valid <= 1'b0;
-      op[4] <= 1'b0; // CAN BE REMOVED IN 2-STATE
+      op[4:3] <= 1'b0; // CAN BE REMOVED IN 2-STATE
     end
     else if (~mcalu_stall) begin
       valid <= exers_mcalu_issue;
@@ -68,7 +71,7 @@ module mcalu(
   // Simple Ops  
   // JAL/R TBD
   always @(*) begin
-    if (!op[4]) begin
+    if (!is_mc_op) begin
       casez(op[2:0])
         3'b000: mcalu_result = (op[3] ? op1 + (~op2+1) : op1 + op2); // ADD,SUB
         3'b001: mcalu_result = (op1 << op2[4:0]); // SLL
@@ -133,7 +136,7 @@ module mcalu(
   /* */
 
   always @(*) begin
-    if (op[4]) begin
+    if (is_mc_op) begin
       if (op[2]) begin  // DIV,REM
         casez(d_state) 
           INIT: begin
@@ -221,7 +224,7 @@ module mcalu(
       state <= INIT;
       d_state <= INIT;
     end
-    else if (valid & op[4]) begin
+    else if (valid & is_mc_op) begin
       // MUL Control
       state <= next_state;
       x0 <= x0_c;

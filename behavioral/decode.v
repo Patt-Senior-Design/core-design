@@ -105,6 +105,7 @@ module decode(
   assign insn_auipc = (insn[6:2] == OPC_AUIPC);
   assign insn_csr = (insn[6:2] == OPC_SYSTEM) & (funct3[1:0] != 0);
   assign insn_lbcmp = (insn[6:2] == OPC_CUSTOM0) & (funct3[1:0] == 2'b11);
+  assign insn_aluext = (insn[6:2] == OPC_CUSTOM1);
 
   wire insn_complex;
   assign insn_complex = fmt_r & insn[25];
@@ -204,6 +205,7 @@ module decode(
       OPC_SYSTEM: fmt_i = 1;
 
       OPC_CUSTOM0: fmt_r = 1;
+      OPC_CUSTOM1: fmt_r = 1;
 
       // unimplemented opcodes
       // floating point
@@ -223,7 +225,6 @@ module decode(
       OPC_OPIMM32: fmt_inv = 1;
 
       // custom instructions
-      OPC_CUSTOM1: fmt_inv = 1;
       OPC_CUSTOM2: fmt_inv = 1;
       OPC_CUSTOM3: fmt_inv = 1;
 
@@ -261,7 +262,7 @@ module decode(
       fmt_b:
         rsop = {2'b01,brop};
       default:
-        rsop = {insn_complex,altop,funct3};
+        rsop = {insn_complex|insn_aluext,insn_complex|altop,funct3};
     endcase
 
   always @(posedge clk)
