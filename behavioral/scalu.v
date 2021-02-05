@@ -29,7 +29,7 @@ module scalu(
     begin
       for (j = 0; j < RS_ENTRIES; j=j+1)
         if (vector[j] == 1) begin
-          priority_vector = (1 << j);
+          compute_priority_vector = (1 << j);
           j = RS_ENTRIES;
         end
     end
@@ -93,7 +93,9 @@ module scalu(
         // Priority Clear
         3'b001: scalu_result = op1 ^ p_vector;
         default: scalu_result = 32'bx;
+      endcase
     end
+  end
 
 
 endmodule

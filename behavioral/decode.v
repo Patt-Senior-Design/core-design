@@ -99,7 +99,7 @@ module decode(
   wire [2:0] funct3;
   assign funct3 = insn[14:12];
 
-  wire insn_load, insn_jalr, insn_auipc, insn_csr, insn_lbcmp;
+  wire insn_load, insn_jalr, insn_auipc, insn_csr, insn_lbcmp, insn_aluext;
   assign insn_load = (insn[6:2] == OPC_LOAD);
   assign insn_jalr = (insn[6:2] == OPC_JALR);
   assign insn_auipc = (insn[6:2] == OPC_AUIPC);
