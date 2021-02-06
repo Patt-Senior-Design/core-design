@@ -27,10 +27,10 @@ module scalu(
   function automatic [4:0] compute_priority_vector (input[31:0] vector);
     integer j;
     begin
-      for (j = 0; j < RS_ENTRIES; j=j+1)
+      for (j = 0; j < 32; j=j+1)
         if (vector[j] == 1) begin
           compute_priority_vector = (1 << j);
-          j = RS_ENTRIES;
+          j = 32;
         end
     end
   endfunction
@@ -70,7 +70,7 @@ module scalu(
   assign scalu_ecause = 0;
 
   always @(*) begin
-    if (op[4]) begin
+    if (!op[4]) begin
       casez(op[2:0])
         3'b000: scalu_result = (op[3] ? op1 + (~op2+1) : op1 + op2); // ADD,SUB
         3'b001: scalu_result = (op1 << op2[4:0]); // SLL

@@ -39,7 +39,7 @@ module mcalu(
   reg[31:0] op2;
   
   wire is_mc_op;
-  assign is_mc_op = op[4] & op[3];
+  assign is_mc_op = &op[4:3];
 
   assign done = is_mc_op ? done_mc : done_sc;
   assign mcalu_stall = (valid & (~done)) | (valid & done & wb_mcalu_stall);
