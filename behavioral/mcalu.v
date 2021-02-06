@@ -28,7 +28,20 @@ module mcalu(
     INIT = 2'b00,
     PROG = 2'b01,
     PROG_FINAL = 2'b10;
-
+  
+  function automatic [31:0] compute_priority_vector (input[31:0] vector);
+    integer j;
+    integer result;
+    begin
+      for (j = 0; j < 32; j=j+1)
+        if (vector[j] == 1) begin
+          result = (1 << j);
+          j = 32;
+        end
+      compute_priority_vector = (|vector ?  result : 0);
+    end
+  endfunction
+ 
   reg valid;
   reg done_sc, done_mc;
   wire done;
@@ -37,6 +50,9 @@ module mcalu(
   reg[5:0] rd;
   reg[31:0] op1;
   reg[31:0] op2;
+
+  reg[31:0] p_vector;
+  reg[4:0] p_index;
   
   wire is_mc_op;
   assign is_mc_op = &op[4:3];
@@ -72,17 +88,31 @@ module mcalu(
   // JAL/R TBD
   always @(*) begin
     if (!is_mc_op) begin
-      casez(op[2:0])
-        3'b000: mcalu_result = (op[3] ? op1 + (~op2+1) : op1 + op2); // ADD,SUB
-        3'b001: mcalu_result = (op1 << op2[4:0]); // SLL
-        3'b010: mcalu_result = ($signed(op1) < $signed(op2)); // SLT
-        3'b011: mcalu_result = (op1 < op2); // SLTU
-        3'b100: mcalu_result = (op[3] ? (op1 == op2) : (op1 ^ op2)); // XOR, SEQ
-        3'b101: mcalu_result = (op[3] ? $signed($signed(op1) >>> op2[4:0]) : (op1 >> op2[4:0])); // SRL, SRA
-        3'b110: mcalu_result = (op1 | op2);
-        3'b111: mcalu_result = (op1 & op2);
-        default: mcalu_result = 32'bx;
-      endcase
+      if (!op[4]) begin
+        casez(op[2:0])
+          3'b000: mcalu_result = (op[3] ? op1 + (~op2+1) : op1 + op2); // ADD,SUB
+          3'b001: mcalu_result = (op1 << op2[4:0]); // SLL
+          3'b010: mcalu_result = ($signed(op1) < $signed(op2)); // SLT
+          3'b011: mcalu_result = (op1 < op2); // SLTU
+          3'b100: mcalu_result = (op[3] ? (op1 == op2) : (op1 ^ op2)); // XOR, SEQ
+          3'b101: mcalu_result = (op[3] ? $signed($signed(op1) >>> op2[4:0]) : (op1 >> op2[4:0])); // SRL, SRA
+          3'b110: mcalu_result = (op1 | op2);
+          3'b111: mcalu_result = (op1 & op2);
+          default: mcalu_result = 32'bx;
+        endcase
+      end
+      // ALU Extensions
+      else begin
+        p_vector = compute_priority_vector(op1 & ~op2);
+        p_index = $clog2(p_vector);
+        casez(op[2:0])
+          // Priority Find: Encoder
+          3'b000: mcalu_result = {~|p_vector, 26'b0 , p_index};
+          // Priority Clear
+          3'b001: mcalu_result = op1 ^ p_vector;
+          default: mcalu_result = 32'bx;
+        endcase
+      end   
       done_sc = valid;
     end
   end

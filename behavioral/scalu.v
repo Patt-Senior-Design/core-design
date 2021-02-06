@@ -24,14 +24,16 @@ module scalu(
   // rob interface
   input         rob_flush);
 
-  function automatic [4:0] compute_priority_vector (input[31:0] vector);
+  function automatic [31:0] compute_priority_vector (input[31:0] vector);
     integer j;
+    integer result;
     begin
       for (j = 0; j < 32; j=j+1)
         if (vector[j] == 1) begin
-          compute_priority_vector = (1 << j);
+          result = (1 << j);
           j = 32;
         end
+      compute_priority_vector = (|vector ? result : 0);
     end
   endfunction
   
@@ -89,7 +91,7 @@ module scalu(
       p_index = $clog2(p_vector);
       casez(op[2:0])
         // Priority Find: Encoder
-        3'b000: scalu_result = {{27{~|p_vector}} , p_index};
+        3'b000: scalu_result = {~|p_vector, 26'b0 , p_index};
         // Priority Clear
         3'b001: scalu_result = op1 ^ p_vector;
         default: scalu_result = 32'bx;
