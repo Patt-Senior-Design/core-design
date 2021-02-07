@@ -25,10 +25,10 @@ module dcache(
   output [31:0] dcache_l2_wdata,
   input         l2_dc_ready,
   input         l2_dc_valid,
-  input         l2_dc_error,
-  input [63:0]  l2_dc_rdata,
-  input         l2_dc_invalidate,
-  input [31:6]  l2_dc_iaddr);
+  input         l2_error,
+  input [63:0]  l2_rdata,
+  input         l2_invalidate,
+  input [31:6]  l2_iaddr);
 
   // 32KB, 4-way associative, 64B line => 128 sets
   function automatic [6:0] addr2set(
@@ -168,8 +168,8 @@ module dcache(
 
   // stage 2 latches
   // four possible inputs, in priority order:
-  // 1. forwarding directly from l2_dc_rdata (lower 32 bits)
-  // 2. forwarding directly from l2_dc_rdata (upper 32 bits)
+  // 1. forwarding directly from l2_rdata (lower 32 bits)
+  // 2. forwarding directly from l2_rdata (upper 32 bits)
   // 3. forwarding from rbuf (s1_forward_r)
   // 4. datamem read (s1_req_r)
   reg        s2_req_r;
@@ -217,7 +217,7 @@ module dcache(
   // l2 interface
   assign dcache_l2_ready = ~&l2req_fwd_valid;
   assign dcache_l2_req = s0_req_r & (s0_mshr_alloc | (s0_op_r[0] & (~s0_mshrhit | s0_wr_merge)));
-  assign dcache_l2_addr = s0_addr_r[31:2];
+  assign dcache_l2_addr = ~s0_op_r[0] ? {s0_addr_r[31:6],4'b0} : s0_addr_r[31:2];
   assign dcache_l2_wen = s0_op_r[0];
   assign dcache_l2_wmask = s0_wmask;
   assign dcache_l2_wdata = s0_wdata_aligned;
@@ -409,13 +409,13 @@ module dcache(
         s2_offset_r <= {1'b0,mshr_req_offset[1:0]};
         s2_lsqid_r <= mshr_req_lsqid[3:0];
         s2_op_r <= mshr_req_op[2:0];
-        s2_rdata_r <= l2_dc_rdata;
+        s2_rdata_r <= l2_rdata;
       end else if(l2_dc_valid & l2req_fwd_valid[1]) begin
         s2_req_r <= 1;
         s2_offset_r <= {1'b1,mshr_req_offset[3:2]};
         s2_lsqid_r <= mshr_req_lsqid[7:4];
         s2_op_r <= mshr_req_op[5:3];
-        s2_rdata_r <= l2_dc_rdata;
+        s2_rdata_r <= l2_rdata;
       end else if(s1_forward_r | s1_req_r) begin
         s2_req_r <= 1;
         s2_offset_r <= s1_offset_r;
@@ -560,7 +560,7 @@ module dcache(
         rbuf_started <= 1;
         rbuf_tail <= rbuf_tail + 1;
         rbuf_valid <= {rbuf_valid[6:0],1'b1};
-        rbuf_data[rbuf_tail[2:0]] <= l2_dc_rdata;
+        rbuf_data[rbuf_tail[2:0]] <= l2_rdata;
       end
 
       if(~s0_wen & fill_wen) begin

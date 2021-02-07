@@ -1,166 +1,187 @@
+`include "buscmd.vh"
+
 // l2 cache
 module l2(
   input         clk,
   input         rst,
 
-  // icache interface
+  // icache interface (in)
   input         icache_req,
   input [31:6]  icache_addr,
   output        l2_ic_ready,
-  output        l2_ic_valid,
-  output        l2_ic_error,
-  output [63:0] l2_ic_rdata,
 
-  // dcache interface
-  input         dcache_l2_ready,
+  // dcache interface (in)
   input         dcache_l2_req,
   input [31:2]  dcache_l2_addr,
   input         dcache_l2_wen,
   input [3:0]   dcache_l2_wmask,
   input [31:0]  dcache_l2_wdata,
   output        l2_dc_ready,
+
+  // icache/dcache interface (out)
+  output        l2_ic_valid,
   output        l2_dc_valid,
-  output        l2_dc_error,
-  output [63:0] l2_dc_rdata,
-  output        l2_dc_invalidate,
-  output [31:6] l2_dc_iaddr);
+  output        l2_error,
+  output [63:0] l2_rdata,
+  input         dcache_l2_ready,
 
-  // request arbitration
-  reg        req_valid;
-  reg [31:2] req_addr;
-  reg        req_wen;
-  reg [3:0]  req_wmask;
-  reg [31:0] req_wdata;
-  always @(*) begin
-    req_valid = icache_req | dcache_l2_req;
-    req_wmask = dcache_l2_wmask;
-    req_wdata = dcache_l2_wdata;
-    if(dcache_l2_req) begin
-      req_addr = dcache_l2_addr;
-      req_wen = dcache_l2_wen;
-    end else begin
-      req_addr = {icache_addr,4'b0};
-      req_wen = 0;
+  output        l2_invalidate,
+  output [31:6] l2_iaddr,
+
+  // bus interface
+  output        l2_bus_req,
+  output [2:0]  l2_bus_cmd,
+  output [4:0]  l2_bus_tag,
+  output [31:2] l2_bus_addr,
+  output [63:0] l2_bus_data,
+  output        l2_bus_hit,
+  output        l2_bus_nack,
+  input         bus_l2_grant,
+
+  input         bus_valid,
+  input         bus_nack,
+  input [2:0]   bus_cmd,
+  input [4:0]   bus_tag,
+  input [31:2]  bus_addr,
+  input [63:0]  bus_data);
+
+  // 128KB, 4-way associative, 64B line => 512 sets
+  function automatic [8:0] addr2set(
+    input [31:2] addr);
+
+    addr2set = addr[14:6];
+  endfunction
+
+  function automatic [16:0] addr2tag(
+    input [31:2] addr);
+
+    addr2tag = addr[31:15];
+  endfunction
+
+  // one-hot signal to index
+  function automatic [1:0] oh2idx(
+    input [3:0] onehot);
+
+    begin
+      oh2idx[1] = onehot[2] | onehot[3];
+      oh2idx[0] = onehot[1] | onehot[3];
     end
-  end
+  endfunction
 
-  reg [7:0]  reqbuf_dcache;
-  reg [31:2] reqbuf_addr [0:7];
-  reg [7:0]  reqbuf_wen;
-  reg [3:0]  reqbuf_wmask [0:7];
-  reg [31:0] reqbuf_wdata [0:7];
+  function [2:0] next_lru(
+    input [3:0] way,
+    input [2:0] lru);
 
-  reg [2:0]  reqbuf_head, reqbuf_tail;
-  reg        reqbuf_head_pol, reqbuf_tail_pol;
-
-  reg        s1_valid;
-  reg        s1_dcache;
-  reg [31:2] s1_addr;
-  reg        s1_wen;
-  reg [3:0]  s1_wmask;
-  reg [31:0] s1_wdata;
-  reg [63:0] s1_rdata;
-
-  integer    s1_cycle;
-
-  wire reqbuf_empty, reqbuf_full;
-  assign reqbuf_empty = (reqbuf_head == reqbuf_tail) & (reqbuf_head_pol == reqbuf_tail_pol);
-  assign reqbuf_full  = (reqbuf_head == reqbuf_tail) & (reqbuf_head_pol != reqbuf_tail_pol);
-
-  wire s1_stall;
-  assign s1_stall = s1_valid & ~s1_wen & ((s1_cycle < 11) | ~dcache_l2_ready);
-
-  wire reqbuf_in_beat, reqbuf_out_beat;
-  assign reqbuf_in_beat = req_valid & ~reqbuf_full;
-  assign reqbuf_out_beat = ~s1_stall & ~reqbuf_empty;
-
-  wire s1_read_valid;
-  assign s1_read_valid = (s1_cycle >= 4);
-
-  wire s1_inc_cycle;
-  assign s1_inc_cycle = ~s1_read_valid | dcache_l2_ready;
-
-  // icache interface
-  assign l2_ic_ready = ~reqbuf_full & ~dcache_l2_req;
-  assign l2_ic_valid = s1_read_valid & ~s1_dcache;
-  assign l2_ic_error = 0;
-  assign l2_ic_rdata = s1_rdata;
-
-  // dcache interface
-  assign l2_dc_ready = ~reqbuf_full;
-  assign l2_dc_valid = s1_read_valid & s1_dcache;
-  assign l2_dc_error = 0;
-  assign l2_dc_rdata = s1_rdata;
-  assign l2_dc_invalidate = 0;
-  assign l2_dc_iaddr = 0;
-
-  // reqbuf_head
-  always @(posedge clk)
-    if(rst) begin
-      reqbuf_head <= 0;
-      reqbuf_head_pol <= 0;
-    end else if(reqbuf_out_beat)
-      {reqbuf_head_pol,reqbuf_head} <= {reqbuf_head_pol,reqbuf_head} + 1;
-
-  // reqbuf_tail
-  always @(posedge clk)
-    if(rst) begin
-      reqbuf_tail <= 0;
-      reqbuf_tail_pol <= 0;
-    end else if(reqbuf_in_beat)
-      {reqbuf_tail_pol,reqbuf_tail} <= {reqbuf_tail_pol,reqbuf_tail} + 1;
-
-  // reqbuf write
-  always @(posedge clk)
-    if(reqbuf_in_beat) begin
-      reqbuf_dcache[reqbuf_tail] <= dcache_l2_req;
-      reqbuf_addr[reqbuf_tail] <= req_addr;
-      reqbuf_wen[reqbuf_tail] <= req_wen;
-      reqbuf_wmask[reqbuf_tail] <= req_wmask;
-      reqbuf_wdata[reqbuf_tail] <= req_wdata;
+    reg [1:0] way_idx;
+    begin
+      way_idx = oh2idx(way);
+      next_lru[2] = ~way_idx[1];
+      next_lru[1] = way_idx[1] ? ~way_idx[0] : lru[1];
+      next_lru[0] = ~way_idx[1] ? ~way_idx[0] : lru[0];
     end
+  endfunction
 
-  // reqbuf read
-  always @(posedge clk)
-    if(rst)
-      s1_valid <= 0;
-    else if(~s1_stall) begin
-      s1_valid <= ~reqbuf_empty;
-      if(~reqbuf_empty) begin
-        s1_dcache <= reqbuf_dcache[reqbuf_head];
-        s1_addr <= reqbuf_addr[reqbuf_head];
-        s1_wen <= reqbuf_wen[reqbuf_head];
-        s1_wmask <= reqbuf_wmask[reqbuf_head];
-        s1_wdata <= reqbuf_wdata[reqbuf_head];
-      end
-    end
+  // 2*4 state bits, 3 lru bits, 17*4 tag bits
+  reg [7:0]   tagmem_state [0:511];
+  reg [2:0]   tagmem_lru [0:511];
+  reg [67:0]  tagmem_tag [0:511];
 
-  // s1_cycle
-  always @(posedge clk)
-    if(rst | ~s1_stall)
-      s1_cycle <= 0;
-    else if(s1_inc_cycle)
-      s1_cycle <= s1_cycle + 1;
+  // 4 banks, 8B wide, 32KB, 64B line => 4096 entries each
+  reg [63:0]  datamem0 [0:4095];
+  reg [63:0]  datamem1 [0:4095];
+  reg [63:0]  datamem2 [0:4095];
+  reg [63:0]  datamem3 [0:4095];
 
-  // read command
-  reg [5:3] offset;
-  always @(*)
-    if(s1_read_valid) begin
-      offset = s1_cycle - 4;
-      top.mem_read(
-        {s1_addr[31:6],offset,1'b0},
-        s1_rdata[31:0]);
-      top.mem_read(
-        {s1_addr[31:6],offset,1'b1},
-        s1_rdata[63:32]);
-    end
+  /*AUTOWIRE*/
+  // Beginning of automatic wires (for undeclared instantiated-module outputs)
+  wire [31:6] l2recv_l2_addr;
+  wire [63:0] l2recv_l2_data;
+  wire        l2recv_l2_fill;
+  wire        l2recv_l2_flush;
+  wire        l2recv_l2_invalidate;
+  wire [3:0]  l2recv_l2_way;
+  wire [31:2] l2reqfifo_addr;
+  wire        l2reqfifo_dcache;
+  wire        l2reqfifo_valid;
+  wire [31:0] l2reqfifo_wdata;
+  wire        l2reqfifo_wen;
+  wire [3:0]  l2reqfifo_wmask;
+  wire        l2trans_l2_ready;
+  wire        l2trans_l2_valid;
+  // End of automatics
 
-  // write command
-  always @(posedge clk)
-    if(s1_valid & s1_wen)
-      top.mem_write(
-        s1_addr,
-        s1_wmask,
-        s1_wdata);
+  l2reqfifo reqfifo(
+    /*AUTOINST*/
+    // Outputs
+    .l2_dc_ready        (l2_dc_ready),
+    .l2_ic_ready        (l2_ic_ready),
+    .l2reqfifo_addr     (l2reqfifo_addr[31:2]),
+    .l2reqfifo_dcache   (l2reqfifo_dcache),
+    .l2reqfifo_valid    (l2reqfifo_valid),
+    .l2reqfifo_wdata    (l2reqfifo_wdata[31:0]),
+    .l2reqfifo_wen      (l2reqfifo_wen),
+    .l2reqfifo_wmask    (l2reqfifo_wmask[3:0]),
+    // Inputs
+    .clk                (clk),
+    .dcache_l2_addr     (dcache_l2_addr),
+    .dcache_l2_req      (dcache_l2_req),
+    .dcache_l2_wdata    (dcache_l2_wdata),
+    .dcache_l2_wen      (dcache_l2_wen),
+    .dcache_l2_wmask    (dcache_l2_wmask),
+    .icache_addr        (icache_addr),
+    .icache_req         (icache_req),
+    .l2_l2reqfifo_ready (l2_l2reqfifo_ready),
+    .rst                (rst));
+
+  l2recv recv(
+    /*AUTOINST*/
+    // Outputs
+    .l2_bus_hit       (l2_bus_hit),
+    .l2_bus_nack      (l2_bus_nack),
+    .l2recv_l2_addr   (l2recv_l2_addr[31:6]),
+    .l2recv_l2_data   (l2recv_l2_data[63:0]),
+    .l2recv_l2_fill   (l2recv_l2_fill),
+    .l2recv_l2_flush  (l2recv_l2_flush),
+    .l2recv_l2_invalidate(l2recv_l2_invalidate),
+    .l2recv_l2_way    (l2recv_l2_way[3:0]),
+    // Inputs
+    .bus_addr         (bus_addr),
+    .bus_cmd          (bus_cmd),
+    .bus_data         (bus_data),
+    .bus_nack         (bus_nack),
+    .bus_tag          (bus_tag),
+    .bus_valid        (bus_valid),
+    .clk              (clk),
+    .l2_l2recv_addr   (l2_l2recv_addr[31:6]),
+    .l2_l2recv_lru    (l2_l2recv_lru[2:0]),
+    .l2_l2recv_ready  (l2_l2recv_ready),
+    .l2_l2recv_state  (l2_l2recv_state[1:0]),
+    .l2_l2recv_valid  (l2_l2recv_valid),
+    .l2_l2recv_way    (l2_l2recv_way[3:0]),
+    .rst              (rst));
+
+  l2trans trans(
+    /*AUTOINST*/
+    // Outputs
+    .l2_bus_addr    (l2_bus_addr),
+    .l2_bus_cmd     (l2_bus_cmd),
+    .l2_bus_data    (l2_bus_data),
+    .l2_bus_req     (l2_bus_req),
+    .l2_bus_tag     (l2_bus_tag),
+    .l2trans_l2_ready(l2trans_l2_ready),
+    .l2trans_l2_valid(l2trans_l2_valid),
+    // Inputs
+    .bus_addr       (bus_addr),
+    .bus_cmd        (bus_cmd),
+    .bus_l2_grant   (bus_l2_grant),
+    .bus_nack       (bus_nack),
+    .bus_tag        (bus_tag),
+    .bus_valid      (bus_valid),
+    .clk            (clk),
+    .l2_l2trans_addr(l2_l2trans_addr[31:6]),
+    .l2_l2trans_cmd (l2_l2trans_cmd[2:0]),
+    .l2_l2trans_data(l2_l2trans_data[63:0]),
+    .l2_l2trans_valid(l2_l2trans_valid),
+    .rst            (rst));
 
 endmodule

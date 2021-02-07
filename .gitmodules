@@ -1,0 +1,3 @@
+[submodule "dramsim/DRAMsim3"]
+	path = dramsim/DRAMsim3
+	url = git@github.com:Patt-Senior-Design/DRAMsim3

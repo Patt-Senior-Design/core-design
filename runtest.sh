@@ -8,6 +8,7 @@ fi
 DIR=$(dirname $0)
 TEST=$1
 
+DRAMCFG=$DIR/dramsim/DDR4_4Gb_x16_2666_2.ini
 HEXFILE=$DIR/tests/$TEST.hex
 ELFFILE=$DIR/tests/$TEST.elf
 LOGFILE=$DIR/tests/$TEST.log
@@ -20,7 +21,7 @@ make -C $DIR/plugins || exit $?
 rm -f simtrace spiketrace
 
 mkfifo simtrace
-timeout 5 $DIR/behavioral/build/top +memfile=$HEXFILE +tracefile=simtrace +logfile=$LOGFILE &
+timeout 5 $DIR/behavioral/build/top +dramcfg=$DRAMCFG +memfile=$HEXFILE +tracefile=simtrace +logfile=$LOGFILE &
 SIMPID=$!
 
 mkfifo spiketrace

@@ -1,0 +1,5 @@
+$dramsim$init       call=init_calltf_shim args=1 acc+=rw,cbk:dramctl
+$dramsim$cmdready   call=cmdready_calltf_shim args=2 size=1 acc+=rw:dramctl
+$dramsim$cmddata    call=cmddata_calltf_shim args=4 acc+=rw:dramctl
+$dramsim$respready  call=respready_calltf_shim args=0 size=1 acc+=rw:dramctl
+$dramsim$respdata   call=respdata_calltf_shim args=3 acc+=rw:dramctl
