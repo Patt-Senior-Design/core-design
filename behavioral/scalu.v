@@ -18,25 +18,12 @@ module scalu(
   output [4:0]  scalu_ecause,
   output [6:0]  scalu_robid,
   output [5:0]  scalu_rd,
-  output reg[31:0] scalu_result,
+  output [31:0] scalu_result,
   input         wb_scalu_stall,
 
   // rob interface
   input         rob_flush);
 
-  function automatic [31:0] compute_priority_vector (input[31:0] vector);
-    integer j;
-    integer result;
-    begin
-      for (j = 0; j < 32; j=j+1)
-        if (vector[j] == 1) begin
-          result = (1 << j);
-          j = 32;
-        end
-      compute_priority_vector = (|vector ? result : 0);
-    end
-  endfunction
-  
   reg valid;
   reg[4:0] op;
   reg[6:0] robid;
@@ -63,7 +50,6 @@ module scalu(
     end
   end
 
-
   assign scalu_stall = valid & wb_scalu_stall;
   assign scalu_valid = valid;
   assign scalu_robid = robid;
@@ -71,33 +57,10 @@ module scalu(
   assign scalu_error = 0;
   assign scalu_ecause = 0;
 
-  always @(*) begin
-    if (!op[4]) begin
-      casez(op[2:0])
-        3'b000: scalu_result = (op[3] ? op1 + (~op2+1) : op1 + op2); // ADD,SUB
-        3'b001: scalu_result = (op1 << op2[4:0]); // SLL
-        3'b010: scalu_result = ($signed(op1) < $signed(op2)); // SLT
-        3'b011: scalu_result = (op1 < op2); // SLTU
-        3'b100: scalu_result = (op[3] ? (op1 == op2) : (op1 ^ op2)); // XOR, SEQ
-        3'b101: scalu_result = (op[3] ? $signed($signed(op1) >>> op2[4:0]) : (op1 >> op2[4:0])); // SRL, SRA
-        3'b110: scalu_result = (op1 | op2);
-        3'b111: scalu_result = (op1 & op2);
-        default: scalu_result = 32'bx;
-      endcase
-    end
-    // ALU Extensions
-    else begin
-      p_vector = compute_priority_vector(op1 & ~op2);
-      p_index = $clog2(p_vector);
-      casez(op[2:0])
-        // Priority Find: Encoder
-        3'b000: scalu_result = {~|p_vector, 26'b0 , p_index};
-        // Priority Clear
-        3'b001: scalu_result = op1 ^ p_vector;
-        default: scalu_result = 32'bx;
-      endcase
-    end
-  end
-
-
+  alu_simple alu(
+    .op(op),
+    .op1(op1),
+    .op2(op2),
+    .sc_result(scalu_result));
+  
 endmodule
