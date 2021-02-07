@@ -7,7 +7,7 @@ OBJDUMP := $(TARGET)-objdump
 
 ASFLAGS := -march=rv32im -mabi=ilp32
 CFLAGS := -march=rv32im -mabi=ilp32 -Wall -O2 -ffunction-sections -fdata-sections
-CXXFLAGS := -march=rv32im -mabi=ilp32 -Wall -O2 -ffunction-sections -fdata-sections
+CXXFLAGS := $(CFLAGS)
 LFLAGS := -march=rv32im -mabi=ilp32 -nostartfiles -Wl,--gc-sections
 
 SRCS_S := $(filter-out startup.s, $(wildcard *.s))
