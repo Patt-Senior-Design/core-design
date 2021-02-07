@@ -7,7 +7,7 @@ module top();
     .rst(rst));
 
   always
-    #5 clk = ~clk;
+    #0.5 clk = ~clk;
 
   initial begin
     $dumpfile("top.vcd");
@@ -16,7 +16,7 @@ module top();
 
     clk = 0;
     rst = 1;
-    #100;
+    #10;
     rst = 0;
   end
 
