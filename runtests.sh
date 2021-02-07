@@ -1,7 +1,7 @@
 #!/bin/sh
 
 DIR=$(dirname $0)
-TESTS="$(basename -s .s $DIR/tests/*.s) $(basename -s .c $DIR/tests/*.c)"
+TESTS="$(basename -s .s $DIR/tests/*.s) $(basename -s .c $DIR/tests/*.c) $(basename -s .cpp $DIR/tests/*.cpp)"
 for TEST in $TESTS; do
     if [ $TEST = startup -o $TEST = stdlib ]; then continue; fi
 
