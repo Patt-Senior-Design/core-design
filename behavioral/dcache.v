@@ -205,7 +205,7 @@ module dcache(
   assign l2req_fwd_valid = mshr_obsolete ? 0 : mshr_req_valid[1:0];
 
   // must stall when there is a higher priority input to stage 2 present
-  assign s1_stall = s1_req_r & l2_dc_valid & (|l2req_fwd_valid);
+  assign s1_stall = (s1_req_r | s1_forward_r) & l2_dc_valid & (|l2req_fwd_valid);
 
   // lsq interface
   assign dcache_lsq_ready = ~s0_stall;
