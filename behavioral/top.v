@@ -330,7 +330,7 @@ module top();
   integer trace_cycles;
   task printstats();
     begin
-      trace_cycles = $stime / 10;
+      trace_cycles = $stime;
       $display("*** SUMMARY STATISTICS ***");
       $display("Cycles elapsed: %0d", trace_cycles);
       $display("Instructions retired: %0d", trace_instret);
