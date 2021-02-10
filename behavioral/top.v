@@ -12,7 +12,7 @@ module top();
   initial begin
     $dumpfile("top.vcd");
     $dumpvars;
-    $dumplimit(32*1024*1024);
+    $dumplimit(32*1024*1024*1024);
 
     clk = 0;
     rst = 1;
