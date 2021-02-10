@@ -225,19 +225,23 @@ module mcalu(
       d_state <= INIT;
     end
     else if (valid & is_mc_op) begin
-      // MUL Control
-      state <= next_state;
-      x0 <= x0_c;
-      acc <= acc_c;
-      iter <= iter_c;
-      inv <= inv_c;
-      // DIV Control
-      d_state <= d_next_state;
-      d_acc <= d_acc_c;
-      d_iter <= d_iter_c;
-      dsor <= dsor_c;
-      dvd_sgn <= dvd_sgn_c;
-      dsor_sgn <= dsor_sgn_c;
+      if(op[2]) begin
+        // DIV Control
+        d_state <= d_next_state;
+        d_acc <= d_acc_c;
+        d_iter <= d_iter_c;
+        dsor <= dsor_c;
+        dvd_sgn <= dvd_sgn_c;
+        dsor_sgn <= dsor_sgn_c;
+      end
+      else begin
+        // MUL Control
+        state <= next_state;
+        x0 <= x0_c;
+        acc <= acc_c;
+        iter <= iter_c;
+        inv <= inv_c;
+      end
     end
   end
 
