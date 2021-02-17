@@ -1,18 +1,17 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <inttypes.h>
 
-#define G_SIZE 40
-#define EDGE_CT 90
-#define N_MAX 13
+#define G_SIZE 10
+#define EDGE_CT 40
 
 typedef struct Node_t {
-  uint32_t marked;
+  struct Node_t** neighbors;
   uint32_t neigh_ct;
+  uint8_t marked;
   struct Node_t* parent;
-  struct Node_t* neighbors[N_MAX];
+  uint32_t neigh_max_ct;
 } Node;
 
 struct Graph {
@@ -24,11 +23,27 @@ struct Graph {
 void initNode(Node* node) {
   node->marked = 0;
   node->neigh_ct = 0;
+  node->neigh_max_ct = 4;
+  node->neighbors = (Node**) malloc (4 * sizeof(Node*));
 }
 
 uint32_t getNodeId(struct Graph* graph, Node* n) {
   return (n - graph->nodes);
 }
+/*uint32_t addNode (struct Graph* graph, uint32_t* neighbors) {
+  // If space is full
+  if (graph->size == graph->max_size) {
+    uint32_t new_max_size = 2 * graph->max_size;
+    graph->max_size = new_max_size;
+    // Increase size of node array
+    graph->nodes = (Node*) realloc (graph->nodes, new_max_size * sizeof(Node));
+  }
+  uint32_t index = graph->size;
+  // Allocate new node
+  initNode(graph->nodes + (graph->size++));
+  return index;
+}*/
+
 
 void create_graph(struct Graph* graph, int size) {
   graph->size = size;
@@ -40,22 +55,30 @@ void create_graph(struct Graph* graph, int size) {
   for (int i = 0; i < size; i++) {
     initNode(nodes + i);
   }
+
   graph->nodes = nodes;
 }
 
 
-bool add_edge (struct Graph* graph, uint32_t from, uint32_t to) {
+
+void add_edge (struct Graph* graph, uint32_t from, uint32_t to) {
   Node* from_node = graph->nodes + from;
   Node* to_node = graph->nodes + to;
   // Check error
-  if (to >= graph->size || (from_node->neigh_ct == N_MAX)) {
-    printf("Out of Bounds edge OR Edge Overflow\n");
-    return 1;
+  if (to >= graph->size) {
+    printf("Out of Bounds edge\n");
+    return;
   }
 
-  // Assign the edge: Cannot exceed 13
+  uint32_t from_max_ct = from_node->neigh_max_ct;
+  uint32_t from_ct = from_node->neigh_ct;
+  // First edge or if space full
+  if (from_ct == from_max_ct) {
+    from_node->neigh_max_ct = 2 * from_max_ct;
+    from_node->neighbors = (Node**) realloc (from_node->neighbors, from_node->neigh_max_ct * sizeof(Node*));
+  }
+  // Assign the edge
   from_node->neighbors[(from_node->neigh_ct)++] = to_node;
-  return 0;
 }
 
 
@@ -66,6 +89,7 @@ void print_graph(struct Graph* graph) {
     printf("%d(%u) : ", i, cur_node->neigh_ct);
     for (int j = 0; j < cur_node->neigh_ct; j++) {
       printf("%u, ", getNodeId(graph, cur_node->neighbors[j]));
+      //printf("%u, ", graph->nodes + j);//getNodeId(graph, cur_node));
     }
     printf("\n");
   }
@@ -73,9 +97,11 @@ void print_graph(struct Graph* graph) {
 }
 
 void free_graph(struct Graph* graph) {
+  for (int i = 0; i < graph->size; i++) {
+    free(graph->nodes[i].neighbors);
+  }
   free(graph->nodes);
 }
-
 
 int is_neighbor(Node* from, Node* to) {
   for (int i = 0; i < from->neigh_ct; i++)
@@ -85,12 +111,14 @@ int is_neighbor(Node* from, Node* to) {
 }
 
 
+
 typedef struct Queue_t {
   uint32_t head, tail;
   Node* val[G_SIZE];
 } Queue;
 
 void create_queue(Queue* q) {
+  //q->val = (uint32_t*) malloc (G_SIZE * sizeof(uint32_t));
   q->head = q->tail = 0;
 }
 
@@ -100,11 +128,14 @@ void enqueue(Queue* q, Node* val) {
     q->tail = 0;
 }
 
-int dequeue(Queue* q, Node** val) {
-  if (q->head == q->tail) return 0;
-  
+uint32_t dequeue(Queue* q, Node** val) {
+  if (q->head == q->tail)
+    return 0;
+
   *val = q->val[q->head++];
-  if (q->head == G_SIZE)  q->head = 0;
+  if (q->head == G_SIZE)
+    q->head = 0;
+
   return 1;
 }
 
@@ -152,7 +183,6 @@ uint32_t bfs_reachable(struct Graph* graph, Node* from, Node* to) {
     }
   }
 
-  // Get the path
   if (found) {
     uint32_t path[G_SIZE];
     uint32_t ct = 0;
@@ -189,10 +219,7 @@ int main (void) {
     uint32_t from = rand() % G_SIZE;
     uint32_t to = rand() % G_SIZE;
     if (!is_neighbor(graph.nodes + from, graph.nodes + to)) {
-      if (add_edge(&graph, from, to)) {
-        printf("Aborting..\n");
-        return 1;
-      }
+      add_edge(&graph, from, to);
       edge_ct++;
     }
   }
