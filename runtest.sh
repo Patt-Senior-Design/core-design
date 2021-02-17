@@ -19,7 +19,7 @@ make -C $DIR/plugins || exit $?
 
 rm -f simtrace spiketrace
 
-TIMEOUT=100
+TIMEOUT=120
 
 mkfifo simtrace
 timeout $TIMEOUT $DIR/behavioral/build/top +memfile=$HEXFILE +tracefile=simtrace +logfile=$LOGFILE &
