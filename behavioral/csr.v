@@ -79,11 +79,11 @@ module csr(
 
   // Stage latches: ROBID only latched when valid to handle minstret
   always @(posedge clk) begin
-    valid <= rename_csr_write & (~valid);
+    valid <= rename_csr_write;
     op <= rename_op[2:0];
     rd <= rename_rd;
     op1 <= rename_op1;
-    if (rename_csr_write & (~valid))
+    if (rename_csr_write)
       robid <= rename_robid;
       addr <= rename_imm[11:0];
   end

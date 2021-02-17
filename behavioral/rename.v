@@ -118,7 +118,7 @@ module rename(
     // reservation stations seq
     rename_lsq_write = valid & uses_memory;
     rename_exers_write = valid & (~uses_memory) & (~csr_access); 
-    rename_csr_write = csr_valid_access & prior_inflight_ret;
+    rename_csr_write = csr_valid_access & prior_inflight_ret & (~csr_valid);
     rename_op = op;
     rename_robid = robid;
     rename_rd = rd | {forward,5'b0}; // inhibit uses_rd if forwarding
@@ -172,7 +172,7 @@ module rename(
     
     // stall combinational
     rename_stall = (rename_exers_write & exers_stall) | (rename_lsq_write & lsq_stall) | 
-                    (csr_valid_access & ~prior_inflight_ret) | csr_valid;
+                    (csr_valid_access & ~prior_inflight_ret) | rename_csr_write;
 
     rename_rs1 = rs1;
     rename_rs2 = rs2;
