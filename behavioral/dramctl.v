@@ -36,7 +36,6 @@ module dramctl(
       `CMD_BUSRD: cmd_write = 0;
       `CMD_BUSRDX: cmd_write = 0;
       `CMD_FLUSH: cmd_write = 1;
-      `CMD_FLUSHOPT: cmd_write = 1;
       default: cmd_relevant = 0;
     endcase
   end

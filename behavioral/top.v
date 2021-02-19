@@ -1,3 +1,5 @@
+`include "buscmd.vh"
+
 module top();
 
   reg clk;
@@ -361,6 +363,48 @@ module top();
   task log_rob_flush();
     if(logfd)
       $fdisplay(logfd, "%0d flush", $stime);
+  endtask
+
+  reg [63:0] bus_data [0:7];
+
+  task log_bus_data(
+    input [2:0]  index,
+    input [63:0] data);
+
+    if(logfd)
+      bus_data[index] = data;
+  endtask
+
+  task log_bus_cycle(
+    input        nack,
+    input        hit,
+    input [2:0]  cmd,
+    input [4:0]  tag,
+    input [31:6] addr);
+
+    integer       i;
+    reg [7*8-1:0] cmd_name;
+    if(logfd) begin
+      case(cmd)
+        `CMD_BUSRD: cmd_name = "BusRd";
+        `CMD_BUSRDX: cmd_name = "BusRdX";
+        `CMD_BUSUPGR: cmd_name = "BusUpgr";
+        `CMD_FILL: cmd_name = "Fill";
+        `CMD_FLUSH: cmd_name = "Flush";
+        default: cmd_name = "???";
+      endcase
+
+      $fwrite(logfd, "%0d bus %0d:%0d %0s %x", $stime,
+        tag[4:3], tag[2:0], cmd_name, {addr,6'b0});
+      if(cmd == `CMD_FILL || cmd == `CMD_FLUSH)
+        for(i = 0; i < 8; i=i+1)
+          $fwrite(logfd, " %x", bus_data[i]);
+      if(nack)
+        $fwrite(logfd, " NACK");
+      if(hit)
+        $fwrite(logfd, " Hit");
+      $fdisplay(logfd);
+    end
   endtask
 
 endmodule

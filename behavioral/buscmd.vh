@@ -1,14 +1,14 @@
-// request defines
-`define CMD_BUSRD    0
-`define CMD_BUSRDX   1
-`define CMD_BUSUPGR  2
-`define CMD_FLUSH    3
+// command defines
+// - without data
+`define CMD_BUSRD   3'b000
+`define CMD_BUSRDX  3'b001
+`define CMD_BUSUPGR 3'b010
+// - with data
+`define CMD_FILL    3'b100
+`define CMD_FLUSH   3'b101
 
-// response defines
-`define CMD_FILL     4
-`define CMD_FLUSHOPT 5
+// busid defines (upper bits of tag)
+`define BUSID_L2   2'b00
+`define BUSID_BFS  2'b01
+`define BUSID_DRAM 2'b10
 
-// busid defines
-`define BUSID_L2   0
-`define BUSID_BFS  1
-`define BUSID_DRAM 2

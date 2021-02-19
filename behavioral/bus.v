@@ -181,4 +181,17 @@ module bus(
     end
   end
 
+  always @(posedge clk)
+    if(bus_valid) begin
+      if(bus_cmd == `CMD_FILL || bus_cmd == `CMD_FLUSH)
+        top.log_bus_data(bus_cycle_r, bus_data);
+      if(bus_cycle_r == 7)
+        top.log_bus_cycle(
+          bus_nack,
+          bus_hit,
+          bus_cmd,
+          bus_tag,
+          bus_addr);
+    end
+
 endmodule
