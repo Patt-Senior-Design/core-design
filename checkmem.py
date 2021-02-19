@@ -89,12 +89,15 @@ class MemoryTrace:
                 elif category == "resp":
                     # read response
                     lsqid = int(fields[2])
-                    rdata = int(fields[3], 16)
                     if lsqids[lsqid] is None:
                         print("FAIL checkmem at line {} ({}ns): orphaned response".format(linenum, time))
                         success = False
                     else:
-                        self.entries[lsqids[lsqid]].rdata = rdata
+                        if fields[3] == "error":
+                            self.entries[lsqids[lsqid]].rdata = "<error>"
+                        else:
+                            rdata = int(fields[3], 16)
+                            self.entries[lsqids[lsqid]].rdata = rdata
                         lsqids[lsqid] = None
                 elif category == "flush":
                     for index in lsqids:
@@ -111,6 +114,8 @@ class MemoryTrace:
     def check(self) -> tuple:
         memory = [0] * RAMSIZE
         for entry in self.entries:
+            if entry.rdata == "<error>":
+                continue
             if entry.category[0] == "l":
                 if entry.rdata == "<flushed>":
                     continue
