@@ -16,7 +16,6 @@ DIFFFILE=$DIR/tests/$TEST.diff
 
 make -C $DIR/tests || exit $?
 make -C $DIR/behavioral || exit $?
-make -C $DIR/plugins || exit $?
 
 rm -f simtrace spiketrace
 

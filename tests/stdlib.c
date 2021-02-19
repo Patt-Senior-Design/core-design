@@ -2,16 +2,24 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#define R_UART_STATUS *((volatile uint32_t *) 0x30010000)
-#define R_UART_RX     *((volatile uint32_t *) 0x30010004)
-#define R_UART_TX     *((volatile uint32_t *) 0x30010008)
+#define CSR_MUARTSTAT "0xfc0"
+#define CSR_MUARTRX   "0xfc1"
+#define CSR_MUARTTX   "0x7c0"
 
-#define M_UART_RXEMPTY (0x00000001)
-#define M_UART_RXFULL  (0x00000002)
-#define M_UART_TXEMPTY (0x00000004)
-#define M_UART_TXFULL  (0x00000008)
+#define MUARTSTAT_RXEMPTY (0x00000001)
+#define MUARTSTAT_RXFULL  (0x00000002)
+#define MUARTSTAT_TXEMPTY (0x00000004)
+#define MUARTSTAT_TXFULL  (0x00000008)
 
 #define HEAP_MAX (0x8000)
+
+#define read_csr(reg) ({ unsigned long __tmp;     \
+    asm volatile ("csrr %0, " reg : "=r"(__tmp)); \
+    __tmp; })
+
+#define write_csr(reg, val) ({ unsigned long __tmp;    \
+    __tmp = val;                                       \
+    asm volatile ("csrw " reg ", %0" : : "r"(__tmp)); })
 
 extern uint8_t _sdata;
 extern uint8_t _end;
@@ -28,8 +36,8 @@ ssize_t _read(int fd, void *buf, size_t count) {
 
     uint8_t *_buf = (uint8_t *) buf;
     for (size_t i = 0; i < count; i++) {
-        while (R_UART_STATUS & M_UART_RXEMPTY) {}
-        _buf[i] = R_UART_RX;
+        while (read_csr(CSR_MUARTSTAT) & MUARTSTAT_RXEMPTY) {}
+        _buf[i] = read_csr(CSR_MUARTRX);
     }
 
     return count;
@@ -40,8 +48,8 @@ ssize_t _write(int fd, void *buf, size_t count) {
 
     uint8_t *_buf = (uint8_t *) buf;
     for (size_t i = 0; i < count; i++) {
-        while (R_UART_STATUS & M_UART_TXFULL) {}
-        R_UART_TX = _buf[i];
+        while (read_csr(CSR_MUARTSTAT) & MUARTSTAT_TXFULL) {}
+        write_csr(CSR_MUARTTX, _buf[i]);
     }
 
     return count;

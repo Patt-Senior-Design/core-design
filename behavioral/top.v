@@ -28,17 +28,7 @@ module top();
   localparam
     ROM_BASE   = 32'h10000000/4,
     ROM_SIZE   = (256*1024)/4,
-    DBG_TOHOST = 32'h30000000/4,
-    UART_STAT  = 32'h30010000/4,
-    UART_RX    = 32'h30010004/4,
-    UART_TX    = 32'h30010008/4;
-
-  // uart status bits
-  localparam
-    UART_RXEMPTY = 4'b0001,
-    UART_RXFULL  = 4'b0010,
-    UART_TXEMPTY = 4'b0100,
-    UART_TXFULL  = 4'b1000;
+    DBG_TOHOST = 32'h30000000/4;
 
   task automatic openargfile(
     input [16*8-1:0] argname,
@@ -90,23 +80,16 @@ module top();
     input [31:2]      addr,
     output reg [31:0] rdata);
 
-    begin
-      if(addr >= ROM_BASE && addr < (ROM_BASE+ROM_SIZE))
-        rdata = mem_rom[addr-ROM_BASE];
-      else if(addr == UART_STAT)
-        rdata = UART_TXEMPTY | UART_RXEMPTY;
-      else
-        rdata = 0;
-    end
+    if(addr >= ROM_BASE && addr < (ROM_BASE+ROM_SIZE))
+      rdata = mem_rom[addr-ROM_BASE];
+    else
+      rdata = 0;
   endtask
 
-  task mem_write(
-    input [31:2] addr,
-    input [3:0]  wmask,
-    input [31:0] wdata);
+  task uart_tx(
+    input [7:0] char);
 
-    if(addr == UART_TX && wmask[0])
-      $fwrite(uartfd, "%c", wdata[7:0]);
+    $fwrite(uartfd, "%c", char);
   endtask
 
   integer tracefd, logfd;
@@ -222,6 +205,7 @@ module top();
       12'h344: csr_name = "mip";
       12'h34a: csr_name = "mtinst";
       12'h34b: csr_name = "mtval2";
+      12'h7c0: csr_name = "muarttx";
       12'hb00: csr_name = "mcycle";
       12'hb02: csr_name = "minstret";
       12'hb80: csr_name = "mcycleh";
@@ -230,6 +214,8 @@ module top();
       12'hf12: csr_name = "marchid";
       12'hf13: csr_name = "mimpid";
       12'hf14: csr_name = "mhartid";
+      12'hfc0: csr_name = "muartstat";
+      12'hfc1: csr_name = "muartrx";
       default: csr_name = "<unknown>";
     endcase
   endfunction

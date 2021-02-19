@@ -33,13 +33,24 @@ module csr(
     MCYCLE    = 12'hB00,
     MINSTRET  = 12'hB02,
     MCYCLEH   = 12'hB80,
-    MINSTRETH = 12'hB82;
+    MINSTRETH = 12'hB82,
+    MUARTSTAT = 12'hFC0,
+    MUARTRX   = 12'hFC1,
+    MUARTTX   = 12'h7C0;
+
+  // uart status bits
+  localparam
+    MUARTSTAT_RXEMPTY = 32'h00000001,
+    MUARTSTAT_RXFULL  = 32'h00000002,
+    MUARTSTAT_TXEMPTY = 32'h00000004,
+    MUARTSTAT_TXFULL  = 32'h00000008;
 
   // Supported CSRs
   reg [31:0] mcycle;
   reg [31:0] mcycleh;
   reg [31:0] minstret;
   reg [31:0] minstreth;
+  reg [7:0]  muarttx;
 
   // Updated CSR value
   reg [31:0] mcycle_n; 
@@ -91,17 +102,24 @@ module csr(
   // address decoder
   reg sel_mcycle, sel_mcycleh;
   reg sel_minstret, sel_minstreth;
+  reg sel_muartstat, sel_muartrx, sel_muarttx;
   always @(*) begin
     sel_mcycle = 0;
     sel_mcycleh = 0;
     sel_minstret = 0;
     sel_minstreth = 0;
+    sel_muartstat = 0;
+    sel_muartrx = 0;
+    sel_muarttx = 0;
     csr_error = 0;
     case(addr)
       MCYCLE: sel_mcycle = 1;
       MCYCLEH: sel_mcycleh = 1;
       MINSTRET: sel_minstret = 1;
       MINSTRETH: sel_minstreth = 1;
+      MUARTSTAT: sel_muartstat = 1;
+      MUARTRX: sel_muartrx = 1;
+      MUARTTX: sel_muarttx = 1;
       default: csr_error = 1;
     endcase
   end
@@ -113,6 +131,8 @@ module csr(
       sel_mcycleh: csr_result = mcycleh;
       sel_minstret: csr_result = minstret;
       sel_minstreth: csr_result = minstreth;
+      sel_muartstat: csr_result = MUARTSTAT_TXEMPTY | MUARTSTAT_RXEMPTY;
+      sel_muarttx: csr_result = {24'b0,muarttx};
       default: csr_result = 0;
     endcase
 
@@ -168,5 +188,11 @@ module csr(
         robid,
         addr,
         wdata);
+
+  always @(posedge clk)
+    if(wen & sel_muarttx) begin
+      muarttx <= wdata;
+      top.uart_tx(wdata);
+    end
 
 endmodule
