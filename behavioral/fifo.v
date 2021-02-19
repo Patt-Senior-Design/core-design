@@ -30,10 +30,10 @@ module fifo #(
   assign full = (head == tail) & (head_pol != tail_pol);
   assign empty = (head == tail) & (head_pol == tail_pol);
 
-  assign wr_ready = ~full | rd_valid;
+  wire wr_beat, rd_beat;
+  assign wr_ready = ~full | rd_beat;
   assign rd_valid = ~empty;
 
-  wire wr_beat, rd_beat;
   assign wr_beat = wr_valid & wr_ready;
   assign rd_beat = rd_valid & rd_ready;
 
