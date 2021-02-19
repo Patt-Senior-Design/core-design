@@ -25,7 +25,7 @@ module rom(
   // memory map constants
   localparam
     ROM_BASE = 32'h10000000/4,
-    ROM_SIZE = (64*1024)/4;
+    ROM_SIZE = (256*1024)/4;
 
   reg [2:0]  bus_cycle_r;
   reg        cmd_valid_r;

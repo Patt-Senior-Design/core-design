@@ -11,7 +11,8 @@
 #define MUARTSTAT_TXEMPTY (0x00000004)
 #define MUARTSTAT_TXFULL  (0x00000008)
 
-#define HEAP_MAX (0x8000)
+// 96MB (need room for stack)
+#define HEAP_MAX (96ul*1024*1024)
 
 #define read_csr(reg) ({ unsigned long __tmp;     \
     asm volatile ("csrr %0, " reg : "=r"(__tmp)); \

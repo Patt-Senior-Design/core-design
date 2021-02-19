@@ -3,7 +3,7 @@
 import sys
 
 RAMBASE = 0x20000000//4
-RAMSIZE = 0x400000//4
+RAMSIZE = 0x8000000//4
 
 # two categories of entry:
 # 1. read (lw/lh/lb/lhu/lbu/lbcmp)
