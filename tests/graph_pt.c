@@ -20,11 +20,29 @@ struct Graph {
   Node* nodes;
 };
 
+void* malloc_chk(size_t size) {
+  void* data = malloc(size);
+  if(!data) {
+    puts("Failed to malloc, exiting...");
+    exit(1);
+  }
+  return data;
+}
+
+void* realloc_chk(void* ptr, size_t size) {
+  ptr = realloc(ptr, size);
+  if(!ptr) {
+    puts("Failed to realloc, exiting...");
+    exit(1);
+  }
+  return ptr;
+}
+
 void initNode(Node* node) {
   node->marked = 0;
   node->neigh_ct = 0;
   node->neigh_max_ct = 4;
-  node->neighbors = (Node**) malloc (4 * sizeof(Node*));
+  node->neighbors = (Node**) malloc_chk(4 * sizeof(Node*));
 }
 
 uint32_t getNodeId(struct Graph* graph, Node* n) {
@@ -36,7 +54,7 @@ uint32_t getNodeId(struct Graph* graph, Node* n) {
     uint32_t new_max_size = 2 * graph->max_size;
     graph->max_size = new_max_size;
     // Increase size of node array
-    graph->nodes = (Node*) realloc (graph->nodes, new_max_size * sizeof(Node));
+    graph->nodes = (Node*) realloc_chk(graph->nodes, new_max_size * sizeof(Node));
   }
   uint32_t index = graph->size;
   // Allocate new node
@@ -50,7 +68,7 @@ void create_graph(struct Graph* graph, int size) {
   graph->max_size = 2 * size;
 
   // Alloc space for all nodes
-  Node* nodes = (Node*) malloc (2 * size * sizeof(Node));
+  Node* nodes = (Node*) malloc_chk(2 * size * sizeof(Node));
   // Init node neighbors/sizes
   for (int i = 0; i < size; i++) {
     initNode(nodes + i);
@@ -75,7 +93,7 @@ void add_edge (struct Graph* graph, uint32_t from, uint32_t to) {
   // First edge or if space full
   if (from_ct == from_max_ct) {
     from_node->neigh_max_ct = 2 * from_max_ct;
-    from_node->neighbors = (Node**) realloc (from_node->neighbors, from_node->neigh_max_ct * sizeof(Node*));
+    from_node->neighbors = (Node**) realloc_chk(from_node->neighbors, from_node->neigh_max_ct * sizeof(Node*));
   }
   // Assign the edge
   from_node->neighbors[(from_node->neigh_ct)++] = to_node;
@@ -118,7 +136,7 @@ typedef struct Queue_t {
 } Queue;
 
 void create_queue(Queue* q) {
-  //q->val = (uint32_t*) malloc (G_SIZE * sizeof(uint32_t));
+  //q->val = (uint32_t*) malloc_chk(G_SIZE * sizeof(uint32_t));
   q->head = q->tail = 0;
 }
 

@@ -21,6 +21,15 @@ struct Graph {
   Node* nodes;
 };
 
+void* malloc_chk(size_t size) {
+  void* data = malloc(size);
+  if(!data) {
+    puts("Failed to malloc, exiting...");
+    exit(1);
+  }
+  return data;
+}
+
 void initNode(Node* node) {
   node->marked = 0;
   node->neigh_ct = 0;
@@ -35,7 +44,7 @@ void create_graph(struct Graph* graph, int size) {
   graph->max_size = 2 * size;
 
   // Alloc space for all nodes
-  Node* nodes = (Node*) malloc (2 * size * sizeof(Node));
+  Node* nodes = (Node*) malloc_chk(2 * size * sizeof(Node));
   // Init node neighbors/sizes
   for (int i = 0; i < size; i++) {
     initNode(nodes + i);
