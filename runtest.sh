@@ -20,12 +20,14 @@ make -C $DIR/plugins || exit $?
 
 rm -f simtrace spiketrace
 
+TIMEOUT=100
+
 mkfifo simtrace
-timeout 5 $DIR/behavioral/build/top +dramcfg=$DRAMCFG +memfile=$HEXFILE +tracefile=simtrace +logfile=$LOGFILE &
+timeout $TIMEOUT $DIR/behavioral/build/top +dramcfg=$DRAMCFG +memfile=$HEXFILE +tracefile=simtrace +logfile=$LOGFILE &
 SIMPID=$!
 
 mkfifo spiketrace
-timeout 5 $DIR/runspike.sh --log-commits $ELFFILE 2> spiketrace &
+timeout $TIMEOUT $DIR/runspike.sh --log-commits $ELFFILE 2> spiketrace &
 SPIKEPID=$!
 
 # ignore the lines from the spike boot rom

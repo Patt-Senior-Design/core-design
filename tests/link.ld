@@ -2,7 +2,7 @@ ENTRY(_start)
 
 MEMORY
 {
-    ROM (rx) : ORIGIN = 0x10000000, LENGTH = 64K
+    ROM (rx) : ORIGIN = 0x10000000, LENGTH = 256K
     RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 4M
 }
 
@@ -31,4 +31,5 @@ SECTIONS
     tohost = .;
     . += 8;
     fromhost = .;
+    __dso_handle = .;
 }

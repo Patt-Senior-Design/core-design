@@ -12,7 +12,7 @@ module top();
   initial begin
     $dumpfile("top.vcd");
     $dumpvars;
-    $dumplimit(32*1024*1024);
+    $dumplimit(32*1024*1024*1024);
 
     clk = 0;
     rst = 1;
@@ -27,7 +27,7 @@ module top();
   // memory map constants
   localparam
     ROM_BASE   = 32'h10000000/4,
-    ROM_SIZE   = (64*1024)/4,
+    ROM_SIZE   = (256*1024)/4,
     DBG_TOHOST = 32'h30000000/4,
     UART_STAT  = 32'h30010000/4,
     UART_RX    = 32'h30010004/4,
@@ -316,7 +316,7 @@ module top();
   integer trace_cycles;
   task printstats();
     begin
-      trace_cycles = $stime / 10;
+      trace_cycles = $stime;
       $display("*** SUMMARY STATISTICS ***");
       $display("Cycles elapsed: %0d", trace_cycles);
       $display("Instructions retired: %0d", trace_instret);

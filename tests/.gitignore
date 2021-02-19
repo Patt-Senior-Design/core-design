@@ -1,8 +1,3 @@
-*.dis
-*.o
-*.hex
-*.diff
-*.elf
-*.log
-spiketrace
-simtrace
+*
+!*.c
+!*.s
