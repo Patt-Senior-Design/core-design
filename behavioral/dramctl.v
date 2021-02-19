@@ -96,9 +96,6 @@ module dramctl(
       if(cmd_valid_r)
         $dramsim$cmddata(cmd_write_r, cmd_tag_r, cmd_addr_r, bus_wdata_r);
     end else if(bus_cycle_r == 7) begin
-      // this cycle
-      dramctl_bus_req <= $dramsim$respready();
-      dramctl_bus_cmd <= `CMD_FILL;
       // previous cycle
       if(dramctl_bus_req & bus_dramctl_grant) begin
         $dramsim$respdata(resp_tag_r, resp_addr_r, dram_rdata_r);
@@ -106,6 +103,9 @@ module dramctl(
         dramctl_bus_addr <= resp_addr[31:6];
         dramctl_bus_data <= dram_rdata_r[63:0];
       end
+      // this cycle
+      dramctl_bus_req <= $dramsim$respready();
+      dramctl_bus_cmd <= `CMD_FILL;
     end
 
 endmodule

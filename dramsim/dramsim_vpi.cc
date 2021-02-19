@@ -193,6 +193,7 @@ static PLI_INT32 error_cb(p_cb_data cb_data) {
   if(vpi_chk_error(&error)) {
     vpi_printf("%s\n", error.message);
   }
+  return 0;
 }
 
 static PLI_INT32 init_calltf(PLI_BYTE8* user_data) {
@@ -263,6 +264,7 @@ static PLI_INT32 cmddata_calltf(PLI_BYTE8* user_data) {
   }
 
   dramsim->AddTransaction(tag, addr, write);
+  return 0;
 }
 
 static PLI_INT32 respready_calltf(PLI_BYTE8* user_data) {
@@ -292,6 +294,9 @@ static PLI_INT32 respdata_calltf(PLI_BYTE8* user_data) {
   s_vpi_value vpi_value = {vpiVectorVal};
   vpi_value.value.vector = vpi_vecval;
   vpi_put_value(h_data, &vpi_value, nullptr, vpiNoDelay);
+
+  read_queue.pop();
+  return 0;
 }
 
 // VCS needs unmangled symbols
