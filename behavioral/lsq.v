@@ -403,4 +403,10 @@ module lsq(
         rename_op1,
         rename_op2);
 
+  always @(posedge clk)
+    if(~rst)
+      top.log_lsq_inflight(
+        lq_valid,
+        sq_valid);
+
 endmodule

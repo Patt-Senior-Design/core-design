@@ -114,14 +114,31 @@ module top();
   // indexed by lsqid
   reg [6:0]   trace_robid [0:31];
 
+  integer     j;
   integer     trace_instret;
   integer     trace_branches;
   integer     trace_mispreds;
+  integer     trace_rob_inflight;
+  integer     trace_rob_inflight_hist [0:128];
+  integer     trace_lq_inflight_hist [0:16];
+  integer     trace_sq_inflight_hist [0:16];
   initial begin
     trace_instret = 0;
     trace_branches = 0;
     trace_mispreds = 0;
+    trace_rob_inflight = 0;
+    for(j = 0; j < 129; j=j+1)
+      trace_rob_inflight_hist[j] = 0;
+    for(j = 0; j < 17; j=j+1) begin
+      trace_lq_inflight_hist[j] = 0;
+      trace_sq_inflight_hist[j] = 0;
+    end
   end
+
+  always @(posedge clk)
+    if(~rst)
+      trace_rob_inflight_hist[trace_rob_inflight]
+        = trace_rob_inflight_hist[trace_rob_inflight] + 1;
 
   task trace_decode(
     input [6:0]  robid,
@@ -133,6 +150,8 @@ module top();
       trace_imm[robid] = imm;
       trace_uses_mem[robid] = 0;
       trace_writes_csr[robid] = 0;
+
+      trace_rob_inflight = trace_rob_inflight + 1;
     end
   endtask
 
@@ -243,8 +262,9 @@ module top();
         if(mispred)
           trace_mispreds = trace_mispreds + 1;
       end
-      memaddr = trace_membase[robid] + trace_imm[robid];
+      trace_rob_inflight = trace_rob_inflight - 1;
 
+      memaddr = trace_membase[robid] + trace_imm[robid];
       if(tracefd) begin
         $fwrite(tracefd, "core   0: 3 0x%x (0x%x)", {addr,2'b0}, trace_insn[robid]);
         if(error)
@@ -301,6 +321,7 @@ module top();
     end
   end
 
+  integer k;
   integer trace_cycles;
   task printstats();
     begin
@@ -310,6 +331,21 @@ module top();
       $display("Instructions retired: %0d", trace_instret);
       $display("Average CPI: %.3f", $itor(trace_cycles) / $itor(trace_instret));
       $display("Branch prediction accuracy: %.2f", 1.0 - ($itor(trace_mispreds) / $itor(trace_branches)));
+
+      $write("ROB occupancy histogram: ");
+      for(k = 0; k < 129; k=k+1)
+        $write("%0d,", trace_rob_inflight_hist[k]);
+      $display();
+
+      $write("LQ occupancy histogram: ");
+      for(k = 0; k < 17; k=k+1)
+        $write("%0d,", trace_lq_inflight_hist[k]);
+      $display();
+
+      $write("SQ occupancy histogram: ");
+      for(k = 0; k < 17; k=k+1)
+        $write("%0d,", trace_sq_inflight_hist[k]);
+      $display();
     end
   endtask
 
@@ -361,8 +397,11 @@ module top();
   endtask
 
   task log_rob_flush();
-    if(logfd)
-      $fdisplay(logfd, "%0d flush", $stime);
+    begin
+      trace_rob_inflight = 0;
+      if(logfd)
+        $fdisplay(logfd, "%0d flush", $stime);
+    end
   endtask
 
   reg [63:0] bus_data [0:7];
@@ -404,6 +443,26 @@ module top();
       if(hit)
         $fwrite(logfd, " Hit");
       $fdisplay(logfd);
+    end
+  endtask
+
+  task log_lsq_inflight(
+    input [15:0] lq_valid,
+    input [15:0] sq_valid);
+
+    integer i, cnt;
+    begin
+      cnt = 0;
+      for(i = 0; i < 16; i=i+1)
+        if(lq_valid[i])
+          cnt = cnt + 1;
+      trace_lq_inflight_hist[cnt] = trace_lq_inflight_hist[cnt] + 1;
+
+      cnt = 0;
+      for(i = 0; i < 16; i=i+1)
+        if(sq_valid[i])
+          cnt = cnt + 1;
+      trace_sq_inflight_hist[cnt] = trace_sq_inflight_hist[cnt] + 1;
     end
   endtask
 
