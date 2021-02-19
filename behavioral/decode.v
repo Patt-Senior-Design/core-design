@@ -122,6 +122,9 @@ module decode(
   assign rs2 = insn[24:20];
   assign rd = insn[11:7];
 
+  wire [2:0] csrop;
+  assign csrop = (funct3[1] & (rs1 == 0)) ? 3'b000 : funct3;
+
   wire uses_rd, uses_rs1, uses_rs2;
   assign uses_rd = (fmt_r | fmt_i | fmt_u | fmt_j) & (rd != 0);
   assign uses_rs1 = fmt_r | (fmt_i & (~insn_csr | ~funct3[2])) | fmt_s | fmt_b;
@@ -261,6 +264,8 @@ module decode(
         rsop = 5'b00000;
       fmt_b:
         rsop = {2'b01,brop};
+      insn_csr:
+        rsop = {2'b00,csrop};
       default:
         rsop = {insn_complex|insn_aluext,insn_complex|altop,funct3};
     endcase
