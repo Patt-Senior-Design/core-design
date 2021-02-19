@@ -3,8 +3,9 @@
 #include <stdlib.h>
 #include <inttypes.h>
 
-#define G_SIZE 10
-#define EDGE_CT 40
+#define G_SIZE 256
+#define EDGE_CT 1024
+#define SEARCHES 32
 
 typedef struct Node_t {
   struct Node_t** neighbors;
@@ -224,30 +225,37 @@ uint32_t bfs_reachable(struct Graph* graph, Node* from, Node* to) {
 
 
 
+uint32_t getRandNodeId (void) {
+  return rand() % G_SIZE;
+}
+
 int main (void) {
   struct Graph graph;
   //srand(time(NULL));
-  
-  uint32_t edge_ct = 0;
 
+  puts("Creating nodes...");
   create_graph(&graph, G_SIZE);
-  
+
   /* Add edges: Prevent duplicates */
-  for (int i = 0; i < EDGE_CT; i++) {
-    uint32_t from = rand() % G_SIZE;
-    uint32_t to = rand() % G_SIZE;
+  puts("Adding edges...");
+  uint32_t edge_ct = 0;
+  while (edge_ct < EDGE_CT) {
+    uint32_t from = getRandNodeId();
+    uint32_t to = getRandNodeId();
     if (!is_neighbor(graph.nodes + from, graph.nodes + to)) {
       add_edge(&graph, from, to);
       edge_ct++;
     }
   }
-  print_graph(&graph);
+  //print_graph(&graph);
 
-  printf("Edge Count: %u\n", edge_ct);
-
-  Node* from = graph.nodes + 3;
-  Node* to = graph.nodes + 5;
-  bfs_reachable(&graph, from, to);
+  puts("Running BFS...");
+  for (int i = 0; i < SEARCHES; i++) {
+    Node* from = graph.nodes + getRandNodeId();
+    Node* to = graph.nodes + getRandNodeId();
+    printf("%d: ", i);
+    bfs_reachable(&graph, from, to);
+  }
 
   free_graph(&graph);
   return 0;
