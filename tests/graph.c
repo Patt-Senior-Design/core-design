@@ -58,7 +58,7 @@ bool add_edge (struct Graph* graph, uint32_t from, uint32_t to) {
   Node* to_node = graph->nodes + to;
   // Check error
   if (to >= graph->size || (from_node->neigh_ct == N_MAX)) {
-    printf("Out of Bounds edge OR Edge Overflow\n");
+    puts("Out of Bounds edge OR Edge Overflow");
     return 1;
   }
 
@@ -69,16 +69,16 @@ bool add_edge (struct Graph* graph, uint32_t from, uint32_t to) {
 
 
 void print_graph(struct Graph* graph) {
-  printf("=== GRAPH STRUCTURE ===\n");
+  puts("=== GRAPH STRUCTURE ===");
   for (int i = 0; i < graph->size; i++) {
     Node* cur_node = graph->nodes + i;
     printf("%d(%u) : ", i, cur_node->neigh_ct);
     for (int j = 0; j < cur_node->neigh_ct; j++) {
       printf("%u, ", getNodeId(graph, cur_node->neighbors[j]));
     }
-    printf("\n");
+    puts("");
   }
-  printf("=======================\n");
+  puts("=======================");
 }
 
 void free_graph(struct Graph* graph) {
@@ -174,11 +174,11 @@ uint32_t bfs_reachable(struct Graph* graph, Node* from, Node* to) {
     for (int i = ct-1; i >= 0; i--) {
       printf(" --> %u", path[i]);
     }
-    printf("\n");
+    puts("");
     return 1;
   }
   else {
-    printf("No solution");
+    puts("No solution");
     return 0;
   }
 }
@@ -199,7 +199,7 @@ int main (void) {
     uint32_t to = rand() % G_SIZE;
     if (!is_neighbor(graph.nodes + from, graph.nodes + to)) {
       if (add_edge(&graph, from, to)) {
-        printf("Aborting..\n");
+        puts("Aborting..");
         return 1;
       }
       edge_ct++;

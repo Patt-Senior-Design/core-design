@@ -84,7 +84,7 @@ void add_edge (struct Graph* graph, uint32_t from, uint32_t to) {
   Node* to_node = graph->nodes + to;
   // Check error
   if (to >= graph->size) {
-    printf("Out of Bounds edge\n");
+    puts("Out of Bounds edge");
     return;
   }
 
@@ -101,7 +101,7 @@ void add_edge (struct Graph* graph, uint32_t from, uint32_t to) {
 
 
 void print_graph(struct Graph* graph) {
-  printf("=== GRAPH STRUCTURE ===\n");
+  puts("=== GRAPH STRUCTURE ===");
   for (int i = 0; i < graph->size; i++) {
     Node* cur_node = graph->nodes + i;
     printf("%d(%u) : ", i, cur_node->neigh_ct);
@@ -109,9 +109,9 @@ void print_graph(struct Graph* graph) {
       printf("%u, ", getNodeId(graph, cur_node->neighbors[j]));
       //printf("%u, ", graph->nodes + j);//getNodeId(graph, cur_node));
     }
-    printf("\n");
+    puts("");
   }
-  printf("=======================\n");
+  puts("=======================");
 }
 
 void free_graph(struct Graph* graph) {
@@ -213,11 +213,11 @@ uint32_t bfs_reachable(struct Graph* graph, Node* from, Node* to) {
     for (int i = ct-1; i >= 0; i--) {
       printf(" --> %u", path[i]);
     }
-    printf("\n");
+    puts("");
     return 1;
   }
   else {
-    printf("No solution");
+    puts("No solution");
     return 0;
   }
 }
