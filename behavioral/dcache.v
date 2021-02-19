@@ -129,6 +129,9 @@ module dcache(
   wire [3:0] s0_invalid_way_sel;
   reg [3:0]  s0_mshr_alloc_way;
 
+  // pma checker
+  wire       pma_valid;
+
   // decoded from wdata and op (sw/sh/sb)
   reg [3:0]  s0_wmask;
   reg [31:0] s0_wdata_aligned;
@@ -152,6 +155,7 @@ module dcache(
 
   // forwarding (resp data from rbuf rather than datamem)
   reg        s1_forward_r;
+  reg        s1_error_r;
   reg [3:1]  s1_op_r;
   reg [3:0]  s1_lsqid_r;
   reg [2:0]  s1_offset_r;
@@ -173,6 +177,7 @@ module dcache(
   // 3. forwarding from rbuf (s1_forward_r)
   // 4. datamem read (s1_req_r)
   reg        s2_req_r;
+  reg        s2_error_r;
   reg [3:1]  s2_op_r;
   reg [3:0]  s2_lsqid_r;
   reg [2:0]  s2_offset_r;
@@ -210,13 +215,15 @@ module dcache(
   // lsq interface
   assign dcache_lsq_ready = ~s0_stall;
   assign dcache_lsq_valid = s2_req_r & s2_last & ~lsq_dc_flush;
-  assign dcache_lsq_error = 0;
+  assign dcache_lsq_error = s2_error_r;
   assign dcache_lsq_lsqid = s2_lsqid_r;
   assign dcache_lsq_rdata = s2_burst ? {s2_bcmp_result,s2_bcmp_r} : s2_rdata_extended;
 
   // l2 interface
   assign dcache_l2_ready = ~&l2req_fwd_valid;
-  assign dcache_l2_req = s0_req_r & (s0_mshr_alloc | (s0_op_r[0] & (~s0_mshrhit | s0_wr_merge)));
+  assign dcache_l2_req = s0_req_r & pma_valid &
+                         ((~s0_op_r[0] & s0_tagmiss & ~mshr_valid) |
+                          (s0_op_r[0] & (~s0_mshrhit | s0_wr_merge)));
   assign dcache_l2_addr = ~s0_op_r[0] ? {s0_addr_r[31:6],4'b0} : s0_addr_r[31:2];
   assign dcache_l2_wen = s0_op_r[0];
   assign dcache_l2_wmask = s0_wmask;
@@ -290,7 +297,8 @@ module dcache(
     s0_wr_merge = s0_op_r[0] & s0_mshrhit & ~rbuf_filled[s0_addr_r[5:3]];
   end
 
-  assign s0_mshr_alloc = s0_req_r & ~s0_op_r[0] & s0_tagmiss & ~mshr_valid;
+  assign s0_mshr_alloc = s0_req_r & ~s0_op_r[0] & pma_valid & s0_tagmiss
+                         & l2_dc_ready & ~mshr_valid;
 
   // invalid_way_*
   priarb #(4) invalid_way_arb(
@@ -317,12 +325,12 @@ module dcache(
     s0_stall = 0;
     if(s0_req_r)
       if(s0_burst & ~s0_last)
-        s0_stall = 1;
+        s0_stall = pma_valid;
       else if(~s0_op_r[0])
         if(s0_mshrhit)
           s0_stall = (~s0_rd_forward | s1_stall) & ~s0_rd_merge;
         else if(s0_tagmiss)
-          s0_stall = mshr_valid;
+          s0_stall = pma_valid & (~l2_dc_ready | mshr_valid);
         else
           s0_stall = s1_stall;
       else
@@ -332,7 +340,14 @@ module dcache(
   assign s0_op = s0_burst ? {s0_last,2'b11} : s0_op_r[3:1];
 
   wire s0_wen;
-  assign s0_wen = s0_req_r & s0_op_r[0] & (~s0_tagmiss | (s0_mshrhit & ~rbuf_filled[s0_addr_r[5:3]]));
+  assign s0_wen = s0_req_r & s0_op_r[0] &
+                  (~s0_tagmiss | (s0_mshrhit & ~rbuf_filled[s0_addr_r[5:3]])) &
+                  l2_dc_ready;
+
+  pmacheck pmacheck(
+    .addr(s0_addr_r[31:6]),
+    .write(s0_op_r[0]),
+    .valid(pma_valid));
 
   // s0_wmask, s0_wdata
   // TODO handle misalignment
@@ -355,7 +370,9 @@ module dcache(
   // beat transaction signals
   assign s0_burst = (s0_op_r[2:0] == 3'b110);
   assign s0_last = ~s0_burst | (&s0_cycle_r);
-  assign s0_burst_beat = s0_req_r & s0_burst & (s0_rd_forward | (~s0_mshrhit & ~s0_tagmiss)) & ~s1_stall;
+  assign s0_burst_beat = s0_req_r & s0_burst & pma_valid &
+                         (s0_rd_forward | (~s0_mshrhit & ~s0_tagmiss)) &
+                         ~s1_stall;
 
   // s0_cycle_r
   always @(posedge clk)
@@ -371,24 +388,30 @@ module dcache(
       s1_wen_r <= 0;
     end else if(~s1_stall) begin
       s1_req_r <= s0_req_r & ~s0_op_r[0] & ~s0_mshrhit & ~s0_tagmiss & ~lsq_dc_flush;
-      s1_forward_r <= s0_req_r & s0_rd_forward & ~lsq_dc_flush;
+      s1_forward_r <= s0_req_r & (s0_rd_forward | ~pma_valid) & ~lsq_dc_flush;
+      s1_error_r <= ~pma_valid;
       s1_offset_r <= s0_addr_r[2:0];
       s1_op_r <= s0_op;
       s1_lsqid_r <= s0_lsqid_r;
       s1_raddr_r <= {s0_set,oh2idx(s0_taghits),s0_addr_r[5:3]};
       s1_op2_r <= s0_wdata_r[7:0];
-      if(s0_wen) begin
-        s1_wen_r <= 1;
-        s1_waddr_r <= {s0_set,oh2idx(s0_taghits),s0_addr_r[5:3]};
-        s1_wmask_r <= {4'b0,s0_wmask} << (s0_addr_r[2] * 4);
-        s1_wdata_r <= {4{s0_wdata_aligned}};
-      end else begin
-        s1_wen_r <= fill_wen;
-        s1_waddr_r <= fill_index;
-        s1_wmask_r <= ~mshr_wmask[rbuf_head[2:0]*8+:8];
-        s1_wdata_r <= fill_data;
-      end
     end
+
+  always @(posedge clk)
+    if(s0_wen) begin
+      s1_wen_r <= 1;
+      s1_waddr_r <= {s0_set,
+        s0_mshrhit ? oh2idx(mshr_way) : oh2idx(s0_taghits),
+        s0_addr_r[5:3]};
+      s1_wmask_r <= {4'b0,s0_wmask} << (s0_addr_r[2] * 4);
+      s1_wdata_r <= {4{s0_wdata_aligned}};
+    end else if(fill_wen) begin
+      s1_wen_r <= 1;
+      s1_waddr_r <= fill_index;
+      s1_wmask_r <= ~mshr_wmask[rbuf_head[2:0]*8+:8];
+      s1_wdata_r <= fill_data;
+    end else
+      s1_wen_r <= 0;
 
   // fill_*
   always @(*) begin
@@ -406,18 +429,21 @@ module dcache(
     else begin
       if(l2_dc_valid & l2req_fwd_valid[0]) begin
         s2_req_r <= 1;
+        s2_error_r <= 0;
         s2_offset_r <= {1'b0,mshr_req_offset[1:0]};
         s2_lsqid_r <= mshr_req_lsqid[3:0];
         s2_op_r <= mshr_req_op[2:0];
         s2_rdata_r <= l2_rdata;
       end else if(l2_dc_valid & l2req_fwd_valid[1]) begin
         s2_req_r <= 1;
+        s2_error_r <= 0;
         s2_offset_r <= {1'b1,mshr_req_offset[3:2]};
         s2_lsqid_r <= mshr_req_lsqid[7:4];
         s2_op_r <= mshr_req_op[5:3];
         s2_rdata_r <= l2_rdata;
       end else if(s1_forward_r | s1_req_r) begin
         s2_req_r <= 1;
+        s2_error_r <= s1_error_r;
         s2_offset_r <= s1_offset_r;
         s2_lsqid_r <= s1_lsqid_r;
         s2_op_r <= s1_op_r;
