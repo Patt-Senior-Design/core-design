@@ -50,6 +50,18 @@ module bus(
   output reg [31:2] bus_addr,
   output reg [63:0] bus_data);
 
+  // positive amount = left shift
+  function integer rotate(
+    input integer in,
+    input integer amount,
+    input integer width);
+
+    if(amount > 0)
+      rotate = (in << amount) | (in >> (width - amount));
+    else
+      rotate = (in << (width - (-amount))) | (in >> -amount);
+  endfunction
+
   reg [2:0] bus_cycle_r;
   always @(posedge clk)
     if(rst)
@@ -75,8 +87,8 @@ module bus(
 
   wire [1:0] reqs_rot;
   wire [3:0] resps_rot;
-  assign reqs_rot = (reqs << (2 - req_pri_r)) | (reqs >> req_pri_r);
-  assign resps_rot = (resps << (4 - resp_pri_r)) | (resps >> resp_pri_r);
+  assign reqs_rot = rotate(reqs, req_pri_r, 2);
+  assign resps_rot = rotate(resps, resp_pri_r, 4);
 
   wire       reqarb_valid, resparb_valid;
   wire [1:0] reqarb_out;
@@ -90,12 +102,17 @@ module bus(
     .grant_valid(resparb_valid),
     .grant(resparb_out));
 
+  wire [1:0] reqarb_rot;
+  wire [3:0] resparb_rot;
+  assign reqarb_rot = rotate(reqarb_out, -req_pri_r, 2);
+  assign resparb_rot = rotate(resparb_out, -resp_pri_r, 4);
+
   reg [3:0] arb_out;
   always @(*) begin
     if(resparb_valid)
-      arb_out = resparb_out;
+      arb_out = resparb_rot;
     else if(reqarb_valid)
-      arb_out = {2'b00,reqarb_out};
+      arb_out = {2'b00,reqarb_rot};
     else
       arb_out = 4'b0000;
 
