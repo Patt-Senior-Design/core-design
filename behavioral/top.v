@@ -29,7 +29,7 @@ module top();
     ROM_BASE   = 32'h10000000/4,
     ROM_SIZE   = (256*1024)/4,
     RAM_BASE   = 32'h20000000/4,
-    RAM_SIZE   = (4*1024*1024)/4,
+    RAM_SIZE   = (128*1024*1024)/4,
     DBG_TOHOST = 32'h30000000/4,
     UART_STAT  = 32'h30010000/4,
     UART_RX    = 32'h30010004/4,

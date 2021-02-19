@@ -11,7 +11,8 @@
 #define M_UART_TXEMPTY (0x00000004)
 #define M_UART_TXFULL  (0x00000008)
 
-#define HEAP_MAX (0x8000)
+// 96MB (need room for stack)
+#define HEAP_MAX (96ul*1024*1024)
 
 extern uint8_t _sdata;
 extern uint8_t _end;
