@@ -19,7 +19,8 @@ module rob(
 
   // rename interface
   input         rename_inhibit,
-  output [6:0]  rob_rename_head,
+  input [6:0]   rename_robid,
+  output        rob_rename_ishead,
 
   // wb interface
   input         wb_valid,
@@ -116,7 +117,7 @@ module rob(
   assign rob_robid = buf_tail;
   
   // rename interface: CSR execution
-  assign rob_rename_head = ret_rd_addr;
+  assign rob_rename_ishead = rename_robid == ret_rd_addr;
 
   // common signals
   assign rob_flush = ret_exc | ret_mispred;
@@ -173,7 +174,9 @@ module rob(
     if(rst | rob_flush)
       ret_valid <= 0;
     else begin
-      ret_valid <= buf_executed[ret_rd_addr] & ~ret_rd_empty;
+      // prevent retirement of stores prior to lsq dispatch
+      ret_valid <= buf_executed[ret_rd_addr] & ~ret_rd_empty &
+                   (~buf_retop[ret_rd_addr][3] | ~rob_rename_ishead);
       ret_error <= buf_error[ret_rd_addr];
       ret_retop <= buf_retop[ret_rd_addr];
       ret_addr <= buf_addr[ret_rd_addr];
