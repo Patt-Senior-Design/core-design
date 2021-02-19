@@ -12,3 +12,9 @@
 `define BUSID_BFS  2'b01
 `define BUSID_DRAM 2'b10
 
+// cache state defines
+`define STATE_M  3'b101 // modified
+`define STATE_E  3'b001 // exclusive
+`define STATE_S  3'b010 // shared
+`define STATE_I  3'b000 // invalid
+`define STATE_F  3'b011 // forward

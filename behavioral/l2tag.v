@@ -1,0 +1,460 @@
+// l2 bus receiver
+module l2tag(
+  input            clk,
+  input            rst,
+
+  // l2reqfifo interface
+  input            l2reqfifo_valid,
+  input            l2reqfifo_dcache,
+  input [31:2]     l2reqfifo_addr,
+  input            l2reqfifo_wen,
+  input [3:0]      l2reqfifo_wmask,
+  input [31:0]     l2reqfifo_wdata,
+  output           l2tag_l2reqfifo_ready,
+
+  // bus interface (in)
+  input            bus_valid,
+  input            bus_nack,
+  input [2:0]      bus_cmd,
+  input [4:0]      bus_tag,
+  input [31:6]     bus_addr,
+  input [63:0]     bus_data,
+
+  // l2data interface
+  output           l2tag_req_valid,
+  output           l2tag_req_dcache,
+  output           l2tag_req_cmd_valid,
+  output reg [2:0] l2tag_req_cmd,
+  output [31:3]    l2tag_req_addr,
+  output [3:0]     l2tag_req_way,
+  output           l2tag_req_wen,
+  output [7:0]     l2tag_req_wmask,
+  output [63:0]    l2tag_req_wdata,
+  input            l2data_req_ready,
+
+  output           l2tag_snoop_valid,
+  output [4:0]     l2tag_snoop_tag,
+  output [31:6]    l2tag_snoop_addr,
+  output [3:0]     l2tag_snoop_way,
+  output           l2tag_snoop_wen,
+  output [63:0]    l2tag_snoop_wdata,
+  input            l2data_snoop_ready,
+
+  // l2trans interface
+  input            l2trans_valid,
+  input [2:0]      l2trans_tag,
+
+  // l2 interface
+  output           l2_invalidate,
+  output [31:6]    l2_iaddr,
+
+  // bus interface (out)
+  output           l2_bus_hit,
+  output           l2_bus_nack);
+
+  function automatic [8:0] addr2set(
+    input [31:6] addr);
+
+    addr2set = addr[14:6];
+  endfunction
+
+  function automatic [16:0] addr2tag(
+    input [31:6] addr);
+
+    addr2tag = addr[31:15];
+  endfunction
+
+  // one-hot signal to index
+  function automatic [1:0] oh2idx(
+    input [3:0] onehot);
+
+    begin
+      oh2idx[1] = onehot[2] | onehot[3];
+      oh2idx[0] = onehot[1] | onehot[3];
+    end
+  endfunction
+
+  function [2:0] next_lru(
+    input [3:0] way,
+    input [2:0] lru);
+
+    reg [1:0] way_idx;
+    begin
+      way_idx = oh2idx(way);
+      next_lru[2] = ~way_idx[1];
+      next_lru[1] = way_idx[1] ? ~way_idx[0] : lru[1];
+      next_lru[0] = ~way_idx[1] ? ~way_idx[0] : lru[0];
+    end
+  endfunction
+
+  // 3*4 state bits, 3 lru bits, 17*4 tag bits
+  reg [11:0] tagmem_state [0:511];
+  reg [2:0]  tagmem_lru [0:511];
+  reg [67:0] tagmem_tag [0:511];
+
+  // stage 0 latches
+  reg        s0_req_valid_r;
+  reg        s0_req_dcache_r;
+  reg [31:2] s0_req_addr_r;
+  reg        s0_req_wen_r;
+  reg [3:0]  s0_req_wmask_r;
+  reg [31:0] s0_req_wdata_r;
+
+  reg        s0_snoop_valid_r;
+  reg [2:0]  s0_snoop_cmd_r;
+  reg [4:0]  s0_snoop_tag_r;
+  reg [31:6] s0_snoop_addr_r;
+  reg [63:0] s0_snoop_data_r;
+
+  // stage 1 latches
+  reg        s1_req_valid_r;
+  reg        s1_req_dcache_r;
+  reg [31:3] s1_req_addr_r;
+  reg        s1_req_wen_r;
+  reg [7:0]  s1_req_wmask_r;
+  reg [63:0] s1_req_wdata_r;
+  reg [3:0]  s1_req_tagmem_way_r;
+  reg [3:0]  s1_req_fill_way_r;
+
+  reg        s1_req_miss_r;
+  reg        s1_req_upgr_r;
+  reg        s1_req_evict_r;
+  reg        s1_req_tag_stale_r;
+
+  reg        s1_snoop_valid_r;
+  reg [2:0]  s1_snoop_cmd_r;
+  reg [4:0]  s1_snoop_tag_r;
+  reg [31:6] s1_snoop_addr_r;
+  reg [63:0] s1_snoop_data_r;
+
+  reg [31:6] tagmem_addr_r;
+  reg [3:0]  tagmem_way_r;
+  reg [11:0] tagmem_states_r;
+  reg [2:0]  tagmem_lru_r;
+
+  // pending BusRd/BusRdX response
+  reg        pend_valid_r;
+  reg [2:0]  pend_cmd_r;
+  reg        pend_tag_valid_r;
+  reg [2:0]  pend_tag_r;
+
+  reg        bus_hit_r;
+  reg        bus_nack_r;
+  reg [2:0]  bus_cycle_r;
+
+  // derived signals
+  wire       snoop_en, snoop_valid;
+  assign snoop_en = bus_cycle_r == 0;
+  assign snoop_valid = bus_valid &
+                       ((bus_tag[4:3] != `BUSID_L2) |
+                        (bus_cmd == `CMD_FILL) | (bus_cmd == `CMD_FLUSH));
+
+  wire [1:0] tagmem_way_idx;
+  assign tagmem_way_idx = oh2idx(tagmem_way_r);
+
+  wire [2:0] tagmem_way_state;
+  assign tagmem_way_state = tagmem_states_r[tagmem_way_idx*3+:3];
+
+  wire tagmiss;
+  assign tagmiss = ~|tagmem_way_r;
+
+  wire upgr_shared;
+  assign upgr_shared = s1_req_valid_r & s1_req_wen_r &
+                       ((tagmem_way_state == `STATE_S) |
+                        (tagmem_way_state == `STATE_F));
+
+  wire upgr_exclusive;
+  assign upgr_exclusive = s1_req_valid_r & s1_req_wen_r &
+                          (tagmem_way_state == `STATE_E);
+
+  wire invalidate;
+  assign invalidate = s1_snoop_valid_r & ~tagmiss &
+                      ((s1_snoop_cmd_r == `CMD_BUSRDX) |
+                       (s1_snoop_cmd_r == `CMD_BUSUPGR));
+
+  integer   j;
+  reg [3:0] tagmem_valid;
+  always @(*)
+    for(j = 0; j < 4; j=j+1)
+      tagmem_valid[j] = tagmem_states_r[j*3+:3] != `STATE_I;
+
+  reg [3:0] fill_way;
+  always @(*)
+    if(~&tagmem_valid)
+      // there is an invalid way, use that one
+      casez(tagmem_valid)
+        4'b???0: fill_way = 4'b0001;
+        4'b??01: fill_way = 4'b0010;
+        4'b?011: fill_way = 4'b0100;
+        4'b0111: fill_way = 4'b1000;
+      endcase
+    else
+      // decode lru bits
+      casez(tagmem_lru_r)
+        3'b0?0: fill_way = 4'b0001;
+        3'b0?1: fill_way = 4'b0010;
+        3'b10?: fill_way = 4'b0100;
+        3'b11?: fill_way = 4'b1000;
+      endcase
+
+  wire [2:0] fill_state;
+  assign fill_state = tagmem_states_r[oh2idx(fill_way)*3+:3];
+
+  wire evict;
+  assign evict = (s1_req_valid_r & tagmiss & (fill_state == `STATE_M)) |
+                 (invalidate & (tagmem_way_state == `STATE_M));
+
+  wire flush;
+  assign flush = s1_snoop_valid_r & ~tagmiss &
+                 ((s1_snoop_cmd_r == `CMD_BUSRD) |
+                  (s1_snoop_cmd_r == `CMD_BUSRDX));
+
+  wire fill;
+  assign fill = pend_valid_r & pend_tag_valid_r & s1_snoop_valid_r &
+                (s1_snoop_tag_r == {`BUSID_L2,pend_tag_r});
+
+  wire disown;
+  assign disown = s1_snoop_valid_r & ~tagmiss & (s1_snoop_cmd_r == `CMD_BUSRD);
+
+  wire s0_req_stall, s1_req_stall;
+  assign s0_req_stall = s0_req_valid_r & (s0_snoop_valid_r | s1_req_stall);
+  assign s1_req_stall = s1_req_valid_r &
+                        ((~s1_req_tag_stale_r & (tagmiss | upgr_shared)) |
+                         s1_req_miss_r |
+                         ~l2data_req_ready);
+
+  // l2reqfifo interface
+  assign l2tag_l2reqfifo_ready = ~s0_req_stall;
+
+  // l2data interface
+  assign l2tag_req_valid = (s1_req_valid_r & ~s1_req_stall) |
+                           (s1_req_miss_r & ~pend_valid_r);
+  assign l2tag_req_dcache = s1_req_dcache_r;
+  assign l2tag_req_cmd_valid = s1_req_miss_r;
+  assign l2tag_req_addr = s1_req_addr_r;
+  assign l2tag_req_way = (s1_req_miss_r | s1_req_tag_stale_r)
+                           ? s1_req_tagmem_way_r : tagmem_way_r;
+  assign l2tag_req_wen = ~s1_req_miss_r & s1_req_wen_r;
+  assign l2tag_req_wmask = s1_req_wmask_r;
+  assign l2tag_req_wdata = s1_req_wdata_r;
+
+  always @(*)
+    if(s1_req_evict_r)
+      l2tag_req_cmd = `CMD_FLUSH;
+    else if(s1_req_upgr_r)
+      l2tag_req_cmd = `CMD_BUSUPGR;
+    else if(~s1_req_wen_r)
+      l2tag_req_cmd = `CMD_BUSRD;
+    else
+      l2tag_req_cmd = `CMD_BUSRDX;
+
+  assign l2tag_snoop_valid = s1_snoop_valid_r & (flush | fill);
+  assign l2tag_snoop_tag = s1_snoop_tag_r;
+  assign l2tag_snoop_addr = s1_snoop_addr_r;
+  assign l2tag_snoop_way = flush ? tagmem_way_r : fill_way;
+  assign l2tag_snoop_wen = fill;
+  assign l2tag_snoop_wdata = s1_snoop_data_r;
+
+  // l2 interface
+  assign l2_invalidate = s1_snoop_valid_r & invalidate;
+  assign l2_iaddr = s1_snoop_addr_r;
+
+  // bus interface
+  assign l2_bus_hit = bus_hit_r;
+  assign l2_bus_nack = bus_nack_r;
+
+  // bus_hit_r
+  always @(posedge clk)
+    if(rst | (bus_cycle_r == 0))
+      bus_hit_r <= 0;
+    else if(s1_snoop_valid_r & ~tagmiss)
+      bus_hit_r <= 1;
+
+  // bus_nack_r
+  always @(posedge clk)
+    if(rst | (bus_cycle_r == 0))
+      bus_nack_r <= 0;
+    else if(l2tag_snoop_valid & ~l2data_snoop_ready)
+      bus_nack_r <= 1;
+
+  // bus_cycle_r
+  always @(posedge clk)
+    if(rst)
+      bus_cycle_r <= 0;
+    else
+      bus_cycle_r <= bus_cycle_r + 1;
+
+  always @(posedge clk)
+    if(rst)
+      s0_req_valid_r <= 0;
+    else if(~s0_req_stall) begin
+      s0_req_valid_r <= l2reqfifo_valid;
+      s0_req_dcache_r <= l2reqfifo_dcache;
+      s0_req_addr_r <= l2reqfifo_addr;
+      s0_req_wen_r <= l2reqfifo_wen;
+      s0_req_wmask_r <= l2reqfifo_wmask;
+      s0_req_wdata_r <= l2reqfifo_wdata;
+    end
+
+  always @(posedge clk)
+    if(rst)
+      s0_snoop_valid_r <= 0;
+    else begin
+      s0_snoop_valid_r <= snoop_en & snoop_valid;
+      if(snoop_en & snoop_valid) begin
+        s0_snoop_cmd_r <= bus_cmd;
+        s0_snoop_tag_r <= bus_tag;
+        s0_snoop_addr_r <= bus_addr;
+      end
+    end
+
+  always @(posedge clk)
+    s0_snoop_data_r <= bus_data;
+
+  always @(posedge clk)
+    if(rst)
+      s1_req_valid_r <= 0;
+    else if(~s1_req_stall) begin
+      s1_req_valid_r <= s0_req_valid_r & ~s0_snoop_valid_r;
+      if(s0_req_valid_r & ~s0_snoop_valid_r) begin
+        s1_req_dcache_r <= s0_req_dcache_r;
+        s1_req_addr_r <= s0_req_addr_r[31:3];
+        s1_req_wen_r <= s0_req_wen_r;
+        s1_req_wmask_r <= s0_req_wmask_r << (s0_req_addr_r[2] * 4);
+        s1_req_wdata_r <= {2{s0_req_wdata_r}};
+      end
+    end
+
+  always @(posedge clk)
+    if(s1_req_valid_r & ~s1_req_tag_stale_r) begin
+      s1_req_tagmem_way_r <= tagmem_way_r;
+      s1_req_fill_way_r <= fill_way;
+    end else if(fill)
+      s1_req_tagmem_way_r <= s1_req_fill_way_r;
+
+  always @(posedge clk) begin
+    // reset state machine when we start processing a new request
+    if(~s1_req_stall & ~s0_snoop_valid_r)
+      s1_req_miss_r <= 0;
+
+    // we have a fresh request, check for a miss and latch params
+    if(s1_req_valid_r & ~s1_req_miss_r & ~s1_req_tag_stale_r) begin
+      s1_req_miss_r <= tagmiss | upgr_shared;
+      s1_req_upgr_r <= ~tagmiss & upgr_shared;
+      s1_req_evict_r <= evict;
+    end
+
+    // check confirmations from l2trans
+    if(l2trans_valid)
+      if(s1_req_evict_r)
+        // we got the confirm for a Flush (eviction), now that we have an open
+        // storage space, handle like a normal miss (issue a BusRd/BusRdX)
+        s1_req_evict_r <= 0;
+      else if(s1_req_upgr_r)
+        // we got the confirmation for a BusUpgr, we're done
+        s1_req_miss_r <= 0;
+      else
+        // we got the confirmation for a BusRd/BusRdX, do nothing
+        ;
+
+    // did we get the response to a BusRd/BusRdX?
+    if(fill)
+      s1_req_miss_r <= 0;
+  end
+
+  always @(posedge clk)
+    s1_req_tag_stale_r <= s1_req_stall;
+
+  always @(posedge clk)
+    if(rst)
+      s1_snoop_valid_r <= 0;
+    else begin
+      s1_snoop_valid_r <= s0_snoop_valid_r;
+      if(s0_snoop_valid_r) begin
+        s1_snoop_cmd_r <= s0_snoop_cmd_r;
+        s1_snoop_tag_r <= s0_snoop_tag_r;
+        s1_snoop_addr_r <= s0_snoop_addr_r;
+      end
+    end
+
+  always @(posedge clk)
+    s1_snoop_data_r <= s0_snoop_data_r;
+
+  integer    i;
+  reg [31:6] tmp_addr;
+  reg [3:0]  tmp_way;
+  always @(posedge clk) begin
+    tmp_addr = s0_snoop_valid_r ? s0_snoop_addr_r : s0_req_addr_r[31:6];
+    if(s0_snoop_valid_r | (s0_req_valid_r & ~s1_req_stall)) begin
+      tmp_way = 0;
+      for(i = 0; i < 4; i=i+1)
+        if(tagmem_tag[addr2set(tmp_addr)][i*17+:17] == addr2tag(tmp_addr))
+          tmp_way = tmp_way | (1 << i);
+
+      tagmem_addr_r <= tmp_addr;
+      tagmem_way_r <= tmp_way;
+      tagmem_states_r <= tagmem_state[addr2set(tmp_addr)];
+      tagmem_lru_r <= tagmem_lru[addr2set(tmp_addr)];
+    end
+  end
+
+  integer   k;
+  reg       wr_state;
+  reg [1:0] new_state;
+  always @(posedge clk)
+    if(rst)
+      for(k = 0; k < 512; k=k+1)
+        tagmem_state[k] <= 0;
+    else if(s1_snoop_valid_r | (s1_req_valid_r & ~s1_req_stall)) begin
+      wr_state = 1;
+      case(1)
+        upgr_exclusive: new_state = `STATE_M;
+        disown: new_state = `STATE_S;
+        invalidate: new_state = `STATE_I;
+        // TODO implement state E (we have to defer the state change to the end
+        // of the bus cycle and check bus_hit)
+        fill: new_state = s1_req_wen_r ? `STATE_M : `STATE_F;
+        default: wr_state = 0;
+      endcase
+
+      if(wr_state)
+        tagmem_state[addr2set(tagmem_addr_r)][tagmem_way_idx*3+:3] <= new_state;
+
+      // TODO lru bits
+    end
+
+  always @(posedge clk)
+    if(fill)
+      tagmem_tag[addr2set(tagmem_addr_r)][oh2idx(s1_req_fill_way_r)*17+:17]
+        <= addr2tag(s1_snoop_addr_r);
+
+  always @(posedge clk)
+    if(rst)
+      pend_valid_r <= 0;
+    else begin
+      // are we scheduling a new command?
+      if(l2tag_req_valid & l2data_req_ready & l2tag_req_cmd_valid) begin
+        pend_valid_r <= 1;
+        pend_cmd_r <= l2tag_req_cmd;
+        pend_tag_valid_r <= 0;
+      end
+
+      // l2trans lets us know when our scheduled command was sent
+      if(l2trans_valid)
+        case(pend_cmd_r)
+          `CMD_BUSRD, `CMD_BUSRDX: begin
+            // grab tag and wait for the Fill/Flush
+            pend_tag_valid_r <= 1;
+            pend_tag_r <= l2trans_tag;
+          end
+          `CMD_BUSUPGR:
+            // all done, tagmem will change state to M
+            pend_valid_r <= 0;
+        endcase
+
+      // did we get the response to a BusRd/BusRdX?
+      if(fill)
+        pend_valid_r <= 0;
+    end
+
+endmodule

@@ -16,14 +16,14 @@ module l2reqfifo(
   input [31:0]  dcache_l2_wdata,
   output        l2_dc_ready,
 
-  // l2 interface
+  // l2tag interface
   output        l2reqfifo_valid,
   output        l2reqfifo_dcache,
   output [31:2] l2reqfifo_addr,
   output        l2reqfifo_wen,
   output [3:0]  l2reqfifo_wmask,
   output [31:0] l2reqfifo_wdata,
-  input         l2_l2reqfifo_ready);
+  input         l2tag_l2reqfifo_ready);
 
   reg        req_valid;
   reg [31:2] req_addr;
@@ -56,7 +56,7 @@ module l2reqfifo(
     .wr_ready(reqfifo_wr_ready),
     .wr_data(reqfifo_wr_data),
     .rd_valid(l2reqfifo_valid),
-    .rd_ready(l2_l2reqfifo_ready),
+    .rd_ready(l2tag_l2reqfifo_ready),
     .rd_data(reqfifo_rd_data));
 
   assign l2_ic_ready = reqfifo_wr_ready & ~dcache_l2_req;

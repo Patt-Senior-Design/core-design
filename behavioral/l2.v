@@ -45,105 +45,92 @@ module l2(
   input [31:6]  bus_addr,
   input [63:0]  bus_data);
 
-  // 128KB, 4-way associative, 64B line => 512 sets
-  function automatic [8:0] addr2set(
-    input [31:2] addr);
-
-    addr2set = addr[14:6];
-  endfunction
-
-  function automatic [16:0] addr2tag(
-    input [31:2] addr);
-
-    addr2tag = addr[31:15];
-  endfunction
-
-  // one-hot signal to index
-  function automatic [1:0] oh2idx(
-    input [3:0] onehot);
-
-    begin
-      oh2idx[1] = onehot[2] | onehot[3];
-      oh2idx[0] = onehot[1] | onehot[3];
-    end
-  endfunction
-
-  function [2:0] next_lru(
-    input [3:0] way,
-    input [2:0] lru);
-
-    reg [1:0] way_idx;
-    begin
-      way_idx = oh2idx(way);
-      next_lru[2] = ~way_idx[1];
-      next_lru[1] = way_idx[1] ? ~way_idx[0] : lru[1];
-      next_lru[0] = ~way_idx[1] ? ~way_idx[0] : lru[0];
-    end
-  endfunction
-
-  // 2*4 state bits, 3 lru bits, 17*4 tag bits
-  reg [7:0]   tagmem_state [0:511];
-  reg [2:0]   tagmem_lru [0:511];
-  reg [67:0]  tagmem_tag [0:511];
-
-  // 4 banks, 8B wide, 32KB, 64B line => 4096 entries each
-  reg [63:0]  datamem0 [0:4095];
-  reg [63:0]  datamem1 [0:4095];
-  reg [63:0]  datamem2 [0:4095];
-  reg [63:0]  datamem3 [0:4095];
-
   /*AUTOWIRE*/
   // Beginning of automatic wires (for undeclared instantiated-module outputs)
-  wire [31:6] l2recv_l2_addr;
-  wire [63:0] l2recv_l2_data;
-  wire        l2recv_l2_fill;
-  wire        l2recv_l2_flush;
-  wire        l2recv_l2_invalidate;
-  wire [3:0]  l2recv_l2_way;
+  wire [31:6] l2data_req_addr;
+  wire [2:0]  l2data_req_cmd;
+  wire [63:0] l2data_req_data;
+  wire        l2data_req_ready;
+  wire        l2data_req_valid;
+  wire [31:6] l2data_snoop_addr;
+  wire [63:0] l2data_snoop_data;
+  wire        l2data_snoop_ready;
+  wire [4:0]  l2data_snoop_tag;
+  wire        l2data_snoop_valid;
   wire [31:2] l2reqfifo_addr;
   wire        l2reqfifo_dcache;
   wire        l2reqfifo_valid;
   wire [31:0] l2reqfifo_wdata;
   wire        l2reqfifo_wen;
   wire [3:0]  l2reqfifo_wmask;
-  wire        l2trans_l2_ready;
-  wire        l2trans_l2_valid;
+  wire        l2tag_l2reqfifo_ready;
+  wire [31:3] l2tag_req_addr;
+  wire [2:0]  l2tag_req_cmd;
+  wire        l2tag_req_cmd_valid;
+  wire        l2tag_req_dcache;
+  wire        l2tag_req_valid;
+  wire [3:0]  l2tag_req_way;
+  wire [63:0] l2tag_req_wdata;
+  wire        l2tag_req_wen;
+  wire [7:0]  l2tag_req_wmask;
+  wire [31:6] l2tag_snoop_addr;
+  wire [4:0]  l2tag_snoop_tag;
+  wire        l2tag_snoop_valid;
+  wire [3:0]  l2tag_snoop_way;
+  wire [63:0] l2tag_snoop_wdata;
+  wire        l2tag_snoop_wen;
+  wire        l2trans_l2data_req_ready;
+  wire        l2trans_l2data_snoop_ready;
+  wire [2:0]  l2trans_tag;
+  wire        l2trans_valid;
   // End of automatics
 
-  l2reqfifo reqfifo(
+  l2reqfifo l2reqfifo(
     /*AUTOINST*/
     // Outputs
-    .l2_dc_ready        (l2_dc_ready),
-    .l2_ic_ready        (l2_ic_ready),
-    .l2reqfifo_addr     (l2reqfifo_addr[31:2]),
-    .l2reqfifo_dcache   (l2reqfifo_dcache),
-    .l2reqfifo_valid    (l2reqfifo_valid),
-    .l2reqfifo_wdata    (l2reqfifo_wdata[31:0]),
-    .l2reqfifo_wen      (l2reqfifo_wen),
-    .l2reqfifo_wmask    (l2reqfifo_wmask[3:0]),
+    .l2_dc_ready      (l2_dc_ready),
+    .l2_ic_ready      (l2_ic_ready),
+    .l2reqfifo_addr   (l2reqfifo_addr[31:2]),
+    .l2reqfifo_dcache (l2reqfifo_dcache),
+    .l2reqfifo_valid  (l2reqfifo_valid),
+    .l2reqfifo_wdata  (l2reqfifo_wdata[31:0]),
+    .l2reqfifo_wen    (l2reqfifo_wen),
+    .l2reqfifo_wmask  (l2reqfifo_wmask[3:0]),
     // Inputs
-    .clk                (clk),
-    .dcache_l2_addr     (dcache_l2_addr),
-    .dcache_l2_req      (dcache_l2_req),
-    .dcache_l2_wdata    (dcache_l2_wdata),
-    .dcache_l2_wen      (dcache_l2_wen),
-    .dcache_l2_wmask    (dcache_l2_wmask),
-    .icache_addr        (icache_addr),
-    .icache_req         (icache_req),
-    .l2_l2reqfifo_ready (l2_l2reqfifo_ready),
-    .rst                (rst));
+    .clk              (clk),
+    .dcache_l2_addr   (dcache_l2_addr),
+    .dcache_l2_req    (dcache_l2_req),
+    .dcache_l2_wdata  (dcache_l2_wdata),
+    .dcache_l2_wen    (dcache_l2_wen),
+    .dcache_l2_wmask  (dcache_l2_wmask),
+    .icache_addr      (icache_addr),
+    .icache_req       (icache_req),
+    .l2tag_l2reqfifo_ready(l2tag_l2reqfifo_ready),
+    .rst              (rst));
 
-  l2recv recv(
+  l2tag l2tag(
     /*AUTOINST*/
     // Outputs
     .l2_bus_hit       (l2_bus_hit),
     .l2_bus_nack      (l2_bus_nack),
-    .l2recv_l2_addr   (l2recv_l2_addr[31:6]),
-    .l2recv_l2_data   (l2recv_l2_data[63:0]),
-    .l2recv_l2_fill   (l2recv_l2_fill),
-    .l2recv_l2_flush  (l2recv_l2_flush),
-    .l2recv_l2_invalidate(l2recv_l2_invalidate),
-    .l2recv_l2_way    (l2recv_l2_way[3:0]),
+    .l2_iaddr         (l2_iaddr),
+    .l2_invalidate    (l2_invalidate),
+    .l2tag_l2reqfifo_ready(l2tag_l2reqfifo_ready),
+    .l2tag_req_addr   (l2tag_req_addr[31:3]),
+    .l2tag_req_cmd    (l2tag_req_cmd[2:0]),
+    .l2tag_req_cmd_valid(l2tag_req_cmd_valid),
+    .l2tag_req_dcache (l2tag_req_dcache),
+    .l2tag_req_valid  (l2tag_req_valid),
+    .l2tag_req_way    (l2tag_req_way[3:0]),
+    .l2tag_req_wdata  (l2tag_req_wdata[63:0]),
+    .l2tag_req_wen    (l2tag_req_wen),
+    .l2tag_req_wmask  (l2tag_req_wmask[7:0]),
+    .l2tag_snoop_addr (l2tag_snoop_addr[31:6]),
+    .l2tag_snoop_tag  (l2tag_snoop_tag[4:0]),
+    .l2tag_snoop_valid(l2tag_snoop_valid),
+    .l2tag_snoop_way  (l2tag_snoop_way[3:0]),
+    .l2tag_snoop_wdata(l2tag_snoop_wdata[63:0]),
+    .l2tag_snoop_wen  (l2tag_snoop_wen),
     // Inputs
     .bus_addr         (bus_addr),
     .bus_cmd          (bus_cmd),
@@ -152,36 +139,85 @@ module l2(
     .bus_tag          (bus_tag),
     .bus_valid        (bus_valid),
     .clk              (clk),
-    .l2_l2recv_addr   (l2_l2recv_addr[31:6]),
-    .l2_l2recv_lru    (l2_l2recv_lru[2:0]),
-    .l2_l2recv_ready  (l2_l2recv_ready),
-    .l2_l2recv_state  (l2_l2recv_state[1:0]),
-    .l2_l2recv_valid  (l2_l2recv_valid),
-    .l2_l2recv_way    (l2_l2recv_way[3:0]),
+    .l2data_req_ready (l2data_req_ready),
+    .l2data_snoop_ready(l2data_snoop_ready),
+    .l2reqfifo_addr   (l2reqfifo_addr[31:2]),
+    .l2reqfifo_dcache (l2reqfifo_dcache),
+    .l2reqfifo_valid  (l2reqfifo_valid),
+    .l2reqfifo_wdata  (l2reqfifo_wdata[31:0]),
+    .l2reqfifo_wen    (l2reqfifo_wen),
+    .l2reqfifo_wmask  (l2reqfifo_wmask[3:0]),
+    .l2trans_tag      (l2trans_tag[2:0]),
+    .l2trans_valid    (l2trans_valid),
     .rst              (rst));
 
-  l2trans trans(
+  l2data l2data(
     /*AUTOINST*/
     // Outputs
-    .l2_bus_addr    (l2_bus_addr),
-    .l2_bus_cmd     (l2_bus_cmd),
-    .l2_bus_data    (l2_bus_data),
-    .l2_bus_req     (l2_bus_req),
-    .l2_bus_tag     (l2_bus_tag),
-    .l2trans_l2_ready(l2trans_l2_ready),
-    .l2trans_l2_valid(l2trans_l2_valid),
+    .l2_dc_valid    (l2_dc_valid),
+    .l2_error       (l2_error),
+    .l2_ic_valid    (l2_ic_valid),
+    .l2_rdata       (l2_rdata),
+    .l2data_req_addr(l2data_req_addr[31:6]),
+    .l2data_req_cmd (l2data_req_cmd[2:0]),
+    .l2data_req_data(l2data_req_data[63:0]),
+    .l2data_req_ready(l2data_req_ready),
+    .l2data_req_valid(l2data_req_valid),
+    .l2data_snoop_addr(l2data_snoop_addr[31:6]),
+    .l2data_snoop_data(l2data_snoop_data[63:0]),
+    .l2data_snoop_ready(l2data_snoop_ready),
+    .l2data_snoop_tag(l2data_snoop_tag[4:0]),
+    .l2data_snoop_valid(l2data_snoop_valid),
     // Inputs
-    .bus_addr       (bus_addr),
-    .bus_cmd        (bus_cmd),
-    .bus_l2_grant   (bus_l2_grant),
-    .bus_nack       (bus_nack),
-    .bus_tag        (bus_tag),
-    .bus_valid      (bus_valid),
     .clk            (clk),
-    .l2_l2trans_addr(l2_l2trans_addr[31:6]),
-    .l2_l2trans_cmd (l2_l2trans_cmd[2:0]),
-    .l2_l2trans_data(l2_l2trans_data[63:0]),
-    .l2_l2trans_valid(l2_l2trans_valid),
+    .dcache_l2_ready(dcache_l2_ready),
+    .l2tag_req_addr (l2tag_req_addr[31:3]),
+    .l2tag_req_cmd  (l2tag_req_cmd[2:0]),
+    .l2tag_req_cmd_valid(l2tag_req_cmd_valid),
+    .l2tag_req_dcache(l2tag_req_dcache),
+    .l2tag_req_valid(l2tag_req_valid),
+    .l2tag_req_way  (l2tag_req_way[3:0]),
+    .l2tag_req_wdata(l2tag_req_wdata[63:0]),
+    .l2tag_req_wen  (l2tag_req_wen),
+    .l2tag_req_wmask(l2tag_req_wmask[7:0]),
+    .l2tag_snoop_addr(l2tag_snoop_addr[31:6]),
+    .l2tag_snoop_tag(l2tag_snoop_tag[4:0]),
+    .l2tag_snoop_valid(l2tag_snoop_valid),
+    .l2tag_snoop_way(l2tag_snoop_way[3:0]),
+    .l2tag_snoop_wdata(l2tag_snoop_wdata[63:0]),
+    .l2tag_snoop_wen(l2tag_snoop_wen),
+    .l2trans_l2data_req_ready(l2trans_l2data_req_ready),
+    .l2trans_l2data_snoop_ready(l2trans_l2data_snoop_ready),
     .rst            (rst));
+
+  l2trans l2trans(
+    /*AUTOINST*/
+    // Outputs
+    .l2_bus_addr          (l2_bus_addr),
+    .l2_bus_cmd           (l2_bus_cmd),
+    .l2_bus_data          (l2_bus_data),
+    .l2_bus_req           (l2_bus_req),
+    .l2_bus_tag           (l2_bus_tag),
+    .l2trans_l2data_req_ready(l2trans_l2data_req_ready),
+    .l2trans_l2data_snoop_ready(l2trans_l2data_snoop_ready),
+    .l2trans_tag          (l2trans_tag[2:0]),
+    .l2trans_valid        (l2trans_valid),
+    // Inputs
+    .bus_addr             (bus_addr),
+    .bus_cmd              (bus_cmd),
+    .bus_l2_grant         (bus_l2_grant),
+    .bus_nack             (bus_nack),
+    .bus_tag              (bus_tag),
+    .bus_valid            (bus_valid),
+    .clk                  (clk),
+    .l2data_req_addr      (l2data_req_addr[31:6]),
+    .l2data_req_cmd       (l2data_req_cmd[2:0]),
+    .l2data_req_data      (l2data_req_data[63:0]),
+    .l2data_req_valid     (l2data_req_valid),
+    .l2data_snoop_addr    (l2data_snoop_addr[31:6]),
+    .l2data_snoop_data    (l2data_snoop_data[63:0]),
+    .l2data_snoop_tag     (l2data_snoop_tag[4:0]),
+    .l2data_snoop_valid   (l2data_snoop_valid),
+    .rst                  (rst));
 
 endmodule
