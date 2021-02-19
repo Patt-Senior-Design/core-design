@@ -18,7 +18,7 @@ module l2trans(
   output        l2_bus_req,
   output [2:0]  l2_bus_cmd,
   output [4:0]  l2_bus_tag,
-  output [31:2] l2_bus_addr,
+  output [31:6] l2_bus_addr,
   output [63:0] l2_bus_data,
   input         bus_l2_grant,
 
@@ -27,7 +27,7 @@ module l2trans(
   input         bus_nack,
   input [2:0]   bus_cmd,
   input [4:0]   bus_tag,
-  input [31:2]  bus_addr);
+  input [31:6]  bus_addr);
 
   reg [2:0]  bus_cycle_r;
 

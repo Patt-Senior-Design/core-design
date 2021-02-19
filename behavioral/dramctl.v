@@ -11,13 +11,13 @@ module dramctl(
   input             bus_hit,
   input [2:0]       bus_cmd,
   input [4:0]       bus_tag,
-  input [31:2]      bus_addr,
+  input [31:6]      bus_addr,
   input [63:0]      bus_data,
 
   output reg        dramctl_bus_req,
   output reg [2:0]  dramctl_bus_cmd,
   output reg [4:0]  dramctl_bus_tag,
-  output reg [31:2] dramctl_bus_addr,
+  output reg [31:6] dramctl_bus_addr,
   output reg [63:0] dramctl_bus_data,
   output reg        dramctl_bus_nack,
   input             bus_dramctl_grant);
@@ -30,7 +30,8 @@ module dramctl(
   reg cmd_relevant, cmd_write;
   always @(*) begin
     cmd_relevant = bus_valid & ~bus_nack & ~bus_hit &
-                   (bus_addr >= RAM_BASE) & (bus_addr < (RAM_BASE+RAM_SIZE));
+                   ({bus_addr,4'b0} >= RAM_BASE) &
+                   ({bus_addr,4'b0} < (RAM_BASE+RAM_SIZE));
     case(bus_cmd)
       `CMD_BUSRD: cmd_write = 0;
       `CMD_BUSRDX: cmd_write = 0;
@@ -62,7 +63,7 @@ module dramctl(
     $dramsim$init(dramclk);
 
   wire [31:2] mem_addr;
-  assign mem_addr = bus_addr - RAM_BASE;
+  assign mem_addr = {bus_addr,4'b0} - RAM_BASE;
 
   reg        dramsim_ready;
   reg        cmd_valid_r;
@@ -71,6 +72,10 @@ module dramctl(
   reg [31:2] cmd_addr_r;
   reg [4:0]  resp_tag_r;
   reg [31:2] resp_addr_r;
+
+  wire [31:2] resp_addr;
+  assign resp_addr = resp_addr_r + RAM_BASE;
+
   always @(posedge clk)
     if(rst) begin
       dramctl_bus_req <= 0;
@@ -98,7 +103,7 @@ module dramctl(
       if(dramctl_bus_req & bus_dramctl_grant) begin
         $dramsim$respdata(resp_tag_r, resp_addr_r, dram_rdata_r);
         dramctl_bus_tag <= resp_tag_r;
-        dramctl_bus_addr <= resp_addr_r + RAM_BASE;
+        dramctl_bus_addr <= resp_addr[31:6];
         dramctl_bus_data <= dram_rdata_r[63:0];
       end
     end

@@ -32,7 +32,7 @@ module l2(
   output        l2_bus_req,
   output [2:0]  l2_bus_cmd,
   output [4:0]  l2_bus_tag,
-  output [31:2] l2_bus_addr,
+  output [31:6] l2_bus_addr,
   output [63:0] l2_bus_data,
   output        l2_bus_hit,
   output        l2_bus_nack,
@@ -42,7 +42,7 @@ module l2(
   input         bus_nack,
   input [2:0]   bus_cmd,
   input [4:0]   bus_tag,
-  input [31:2]  bus_addr,
+  input [31:6]  bus_addr,
   input [63:0]  bus_data);
 
   // 128KB, 4-way associative, 64B line => 512 sets
