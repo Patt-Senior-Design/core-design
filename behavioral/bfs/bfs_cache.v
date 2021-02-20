@@ -15,8 +15,13 @@ module bfs_cache (
   integer i;
 
   initial begin
-    for (i = 0; i < 4096; i=i+1)
-      storage[i/8][(i & 3'b111)*8 +: 8]  = (i & 8'hFF);
+    for (i = 0; i < 4096; i=i+1) begin
+      //storage[i/8][(i & 3'b111)*8 +: 8]  = (i & 8'hFF);
+      if (i % 8)
+        storage[i/8] += i;
+      else
+        storage[i/8] = 0;
+    end
   end
 
 
@@ -38,6 +43,8 @@ module bfs_cache (
       if (~ready | counter[0]) begin
         counter <= counter - 1;
         rdata <= storage[(addr_base >> 6) + 8 - counter]; // Get 8 bytes
+        if (counter[3]) // Mark on first iteration
+          storage[addr_base >> 6] <= storage[addr_base >> 6] | (1 << 32);
       end
 
       if (bfs_req) begin
