@@ -6,6 +6,7 @@ module bfs_cache (
   input bfs_req,
   input [31:0] bfs_req_addr,
   output cache_ready,
+  output cache_buf_empty,
 
   // Sync for result
   output cache_fs,
@@ -54,7 +55,7 @@ module bfs_cache (
     end
   end
 
-
+  assign cache_buf_empty = ~req & (~|counter);
   assign cache_ready = ready;
   assign cache_fs = &counter[2:0];
   assign cache_rdata = rdata;
