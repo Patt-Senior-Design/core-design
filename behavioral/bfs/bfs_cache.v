@@ -11,22 +11,26 @@ module bfs_cache (
   output dc_fs,
   output [63:0] dc_rdata);
 
-  reg [63:0] storage [511:0]; // Store 8-Byte elements. 12-bit (4096) address space, byte-addressable
-  integer i;
+  reg [31:0] storage [0:1023]; // Store 4-Byte elements. 12-bit (4096) address space, byte-addressable
+  integer i, fd;
 
   initial begin
-    for (i = 0; i < 4096; i=i+1) begin
-      //storage[i/8][(i & 3'b111)*8 +: 8]  = (i & 8'hFF);
-      if (i % 8)
-        storage[i/8] += (i << 32);
-      else
-        storage[i/8] = (1 << 32);
+    fd = $fopen("graph.mem", "r");
+    if (!fd) begin
+      $display("Cannot open graph.mem file");
+      $finish;
     end
+    $fclose(fd);
+    $readmemh("graph.mem", storage);
+    $display("Loaded graph storage");
   end
 
 
   wire ready;
   assign ready = ~|counter[3:1];
+
+  wire[9:0] acc_addr;
+  assign acc_addr = (addr_base >> 2) + (8 - counter)*2;
 
   reg req;
   reg [31:0] addr_base;
@@ -42,9 +46,9 @@ module bfs_cache (
 
       if (~ready | counter[0]) begin
         counter <= counter - 1;
-        rdata <= storage[(addr_base >> 6) + 8 - counter]; // Get 8 bytes
+        rdata <= {storage[acc_addr + 1], storage[acc_addr]}; // Get 8 bytes
         if (counter[3]) // Mark on first iteration
-          storage[addr_base >> 6] <= storage[addr_base >> 6] | (63'h01);
+          storage[acc_addr + 1] <= storage[acc_addr + 1] | (1 << 31);
       end
 
       if (bfs_dc_req) begin
