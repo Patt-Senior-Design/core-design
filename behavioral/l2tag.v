@@ -4,13 +4,12 @@ module l2tag(
   input            rst,
 
   // l2reqfifo interface
-  input            l2reqfifo_valid,
-  input            l2reqfifo_dcache,
-  input [31:2]     l2reqfifo_addr,
-  input            l2reqfifo_wen,
-  input [3:0]      l2reqfifo_wmask,
-  input [31:0]     l2reqfifo_wdata,
-  output           l2tag_l2reqfifo_ready,
+  input            req_valid,
+  input [31:2]     req_addr,
+  input            req_wen,
+  input [3:0]      req_wmask,
+  input [31:0]     req_wdata,
+  output           l2_req_ready,
 
   // bus interface (in)
   input            bus_valid,
@@ -22,7 +21,6 @@ module l2tag(
 
   // l2data interface
   output           l2tag_req_valid,
-  output           l2tag_req_dcache,
   output           l2tag_req_cmd_valid,
   output reg [2:0] l2tag_req_cmd,
   output [31:3]    l2tag_req_addr,
@@ -99,7 +97,6 @@ module l2tag(
 
   // stage 0 latches
   reg        s0_req_valid_r;
-  reg        s0_req_dcache_r;
   reg [31:2] s0_req_addr_r;
   reg        s0_req_wen_r;
   reg [3:0]  s0_req_wmask_r;
@@ -113,7 +110,6 @@ module l2tag(
 
   // stage 1 latches
   reg        s1_req_valid_r;
-  reg        s1_req_dcache_r;
   reg [31:3] s1_req_addr_r;
   reg        s1_req_wen_r;
   reg [7:0]  s1_req_wmask_r;
@@ -246,12 +242,11 @@ module l2tag(
                           (l2data_flush_hit | l2trans_flush_hit);
 
   // l2reqfifo interface
-  assign l2tag_l2reqfifo_ready = ~s0_req_stall;
+  assign l2_req_ready = ~s0_req_stall;
 
   // l2data interface
   assign l2tag_req_valid = (s1_req_valid_r & ~s1_req_stall) |
                            (s1_req_miss_r & ~pend_valid_r);
-  assign l2tag_req_dcache = s1_req_dcache_r;
   assign l2tag_req_cmd_valid = s1_req_miss_r;
   assign l2tag_req_addr = s1_req_evict_r
                           ? {fill_tag,addr2set(s1_req_addr_r),3'b0}
@@ -318,12 +313,11 @@ module l2tag(
     if(rst)
       s0_req_valid_r <= 0;
     else if(~s0_req_stall) begin
-      s0_req_valid_r <= l2reqfifo_valid;
-      s0_req_dcache_r <= l2reqfifo_dcache;
-      s0_req_addr_r <= l2reqfifo_addr;
-      s0_req_wen_r <= l2reqfifo_wen;
-      s0_req_wmask_r <= l2reqfifo_wmask;
-      s0_req_wdata_r <= l2reqfifo_wdata;
+      s0_req_valid_r <= req_valid;
+      s0_req_addr_r <= req_addr;
+      s0_req_wen_r <= req_wen;
+      s0_req_wmask_r <= req_wmask;
+      s0_req_wdata_r <= req_wdata;
     end
 
   always @(posedge clk)
@@ -347,7 +341,6 @@ module l2tag(
     else if(~s1_req_stall) begin
       s1_req_valid_r <= s0_req_valid_r & ~s0_snoop_valid_r;
       if(s0_req_valid_r & ~s0_snoop_valid_r) begin
-        s1_req_dcache_r <= s0_req_dcache_r;
         s1_req_addr_r <= s0_req_addr_r[31:3];
         s1_req_wen_r <= s0_req_wen_r;
         s1_req_wmask_r <= s0_req_wmask_r << (s0_req_addr_r[2] * 4);

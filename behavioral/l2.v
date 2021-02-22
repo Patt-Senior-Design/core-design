@@ -5,29 +5,23 @@ module l2(
   input         clk,
   input         rst,
 
-  // icache interface (in)
-  input         icache_req,
-  input [31:6]  icache_addr,
-  output        l2_ic_ready,
+  // request interface
+  input         req_valid,
+  input [31:2]  req_addr,
+  input         req_wen,
+  input [3:0]   req_wmask,
+  input [31:0]  req_wdata,
+  output        l2_req_ready,
 
-  // dcache interface (in)
-  input         dcache_l2_req,
-  input [31:2]  dcache_l2_addr,
-  input         dcache_l2_wen,
-  input [3:0]   dcache_l2_wmask,
-  input [31:0]  dcache_l2_wdata,
-  output        l2_dc_ready,
-
-  // icache/dcache interface (out)
-  output        l2_ic_valid,
-  output        l2_dc_valid,
-  output        l2_error,
-  output [63:0] l2_rdata,
-  input         dcache_l2_ready,
+  // response interface
+  output        l2_resp_valid,
+  output        l2_resp_error,
+  output [63:0] l2_resp_rdata,
+  input         resp_ready,
 
   output        l2_inv_valid,
   output [31:6] l2_inv_addr,
-  input         dcache_l2_inv_ready,
+  input         inv_ready,
 
   // bus interface
   output        l2_bus_req,
@@ -59,19 +53,11 @@ module l2(
   wire        l2data_snoop_ready;
   wire [4:0]  l2data_snoop_tag;
   wire        l2data_snoop_valid;
-  wire [31:2] l2reqfifo_addr;
-  wire        l2reqfifo_dcache;
-  wire        l2reqfifo_valid;
-  wire [31:0] l2reqfifo_wdata;
-  wire        l2reqfifo_wen;
-  wire [3:0]  l2reqfifo_wmask;
   wire [31:6] l2tag_inv_addr;
   wire        l2tag_inv_valid;
-  wire        l2tag_l2reqfifo_ready;
   wire [31:3] l2tag_req_addr;
   wire [2:0]  l2tag_req_cmd;
   wire        l2tag_req_cmd_valid;
-  wire        l2tag_req_dcache;
   wire        l2tag_req_valid;
   wire [3:0]  l2tag_req_way;
   wire [63:0] l2tag_req_wdata;
@@ -90,41 +76,17 @@ module l2(
   wire        l2trans_valid;
   // End of automatics
 
-  l2reqfifo l2reqfifo(
-    /*AUTOINST*/
-    // Outputs
-    .l2_dc_ready      (l2_dc_ready),
-    .l2_ic_ready      (l2_ic_ready),
-    .l2reqfifo_addr   (l2reqfifo_addr[31:2]),
-    .l2reqfifo_dcache (l2reqfifo_dcache),
-    .l2reqfifo_valid  (l2reqfifo_valid),
-    .l2reqfifo_wdata  (l2reqfifo_wdata[31:0]),
-    .l2reqfifo_wen    (l2reqfifo_wen),
-    .l2reqfifo_wmask  (l2reqfifo_wmask[3:0]),
-    // Inputs
-    .clk              (clk),
-    .dcache_l2_addr   (dcache_l2_addr),
-    .dcache_l2_req    (dcache_l2_req),
-    .dcache_l2_wdata  (dcache_l2_wdata),
-    .dcache_l2_wen    (dcache_l2_wen),
-    .dcache_l2_wmask  (dcache_l2_wmask),
-    .icache_addr      (icache_addr),
-    .icache_req       (icache_req),
-    .l2tag_l2reqfifo_ready(l2tag_l2reqfifo_ready),
-    .rst              (rst));
-
   l2tag l2tag(
     /*AUTOINST*/
     // Outputs
     .l2_bus_hit       (l2_bus_hit),
     .l2_bus_nack      (l2_bus_nack),
+    .l2_req_ready     (l2_req_ready),
     .l2tag_inv_addr   (l2tag_inv_addr[31:6]),
     .l2tag_inv_valid  (l2tag_inv_valid),
-    .l2tag_l2reqfifo_ready(l2tag_l2reqfifo_ready),
     .l2tag_req_addr   (l2tag_req_addr[31:3]),
     .l2tag_req_cmd    (l2tag_req_cmd[2:0]),
     .l2tag_req_cmd_valid(l2tag_req_cmd_valid),
-    .l2tag_req_dcache (l2tag_req_dcache),
     .l2tag_req_valid  (l2tag_req_valid),
     .l2tag_req_way    (l2tag_req_way[3:0]),
     .l2tag_req_wdata  (l2tag_req_wdata[63:0]),
@@ -148,24 +110,22 @@ module l2(
     .l2data_flush_hit (l2data_flush_hit),
     .l2data_req_ready (l2data_req_ready),
     .l2data_snoop_ready(l2data_snoop_ready),
-    .l2reqfifo_addr   (l2reqfifo_addr[31:2]),
-    .l2reqfifo_dcache (l2reqfifo_dcache),
-    .l2reqfifo_valid  (l2reqfifo_valid),
-    .l2reqfifo_wdata  (l2reqfifo_wdata[31:0]),
-    .l2reqfifo_wen    (l2reqfifo_wen),
-    .l2reqfifo_wmask  (l2reqfifo_wmask[3:0]),
     .l2trans_flush_hit(l2trans_flush_hit),
     .l2trans_tag      (l2trans_tag[2:0]),
     .l2trans_valid    (l2trans_valid),
+    .req_addr         (req_addr),
+    .req_valid        (req_valid),
+    .req_wdata        (req_wdata),
+    .req_wen          (req_wen),
+    .req_wmask        (req_wmask),
     .rst              (rst));
 
   l2data l2data(
     /*AUTOINST*/
     // Outputs
-    .l2_dc_valid    (l2_dc_valid),
-    .l2_error       (l2_error),
-    .l2_ic_valid    (l2_ic_valid),
-    .l2_rdata       (l2_rdata),
+    .l2_resp_error  (l2_resp_error),
+    .l2_resp_rdata  (l2_resp_rdata),
+    .l2_resp_valid  (l2_resp_valid),
     .l2data_flush_hit(l2data_flush_hit),
     .l2data_req_addr(l2data_req_addr[31:6]),
     .l2data_req_cmd (l2data_req_cmd[2:0]),
@@ -179,13 +139,11 @@ module l2(
     .l2data_snoop_valid(l2data_snoop_valid),
     // Inputs
     .clk            (clk),
-    .dcache_l2_ready(dcache_l2_ready),
     .l2tag_inv_addr (l2tag_inv_addr[31:6]),
     .l2tag_inv_valid(l2tag_inv_valid),
     .l2tag_req_addr (l2tag_req_addr[31:3]),
     .l2tag_req_cmd  (l2tag_req_cmd[2:0]),
     .l2tag_req_cmd_valid(l2tag_req_cmd_valid),
-    .l2tag_req_dcache(l2tag_req_dcache),
     .l2tag_req_valid(l2tag_req_valid),
     .l2tag_req_way  (l2tag_req_way[3:0]),
     .l2tag_req_wdata(l2tag_req_wdata[63:0]),
@@ -199,6 +157,7 @@ module l2(
     .l2tag_snoop_wen(l2tag_snoop_wen),
     .l2trans_l2data_req_ready(l2trans_l2data_req_ready),
     .l2trans_l2data_snoop_ready(l2trans_l2data_snoop_ready),
+    .resp_ready     (resp_ready),
     .rst            (rst));
 
   l2trans l2trans(
@@ -237,7 +196,7 @@ module l2(
     .wr_ready(invfifo_ready),
     .wr_data(l2tag_inv_addr),
     .rd_valid(l2_inv_valid),
-    .rd_ready(dcache_l2_inv_ready),
+    .rd_ready(inv_ready),
     .rd_data(l2_inv_addr));
 
 endmodule

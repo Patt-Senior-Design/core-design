@@ -4,11 +4,6 @@ module cpu(
 
   /*AUTOWIRE*/
 
-  wire        icache_req;
-  wire [31:6] icache_addr;
-  assign icache_req = 0;
-  assign icache_addr = 0;
-
   wire        bfs_bus_req;
   wire [2:0]  bfs_bus_cmd;
   wire [4:0]  bfs_bus_tag;
@@ -101,7 +96,16 @@ module cpu(
   bus bus(
     /*AUTOINST*/);
 
+  l2fifo l2fifo(
+    /*AUTOINST*/);
+
   l2 l2(
+    .req_valid(l2fifo_l2_req),
+    .req_addr(l2fifo_l2_addr),
+    .req_wen(l2fifo_l2_wen),
+    .req_wmask(l2fifo_l2_wmask),
+    .req_wdata(l2fifo_l2_wdata),
+    .l2_req_ready(l2_l2fifo_ready),
     /*AUTOINST*/);
 
   dramctl dramctl(

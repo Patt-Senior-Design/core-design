@@ -17,20 +17,21 @@ module dcache(
   output [31:0] dcache_lsq_rdata,
 
   // l2 interface
-  output        dcache_l2_ready,
-  output        dcache_l2_req,
-  output [31:2] dcache_l2_addr,
-  output        dcache_l2_wen,
-  output [3:0]  dcache_l2_wmask,
-  output [31:0] dcache_l2_wdata,
-  input         l2_dc_ready,
-  input         l2_dc_valid,
-  input         l2_error,
-  input [63:0]  l2_rdata,
+  output        dcache_l2fifo_req,
+  output [31:2] dcache_l2fifo_addr,
+  output        dcache_l2fifo_wen,
+  output [3:0]  dcache_l2fifo_wmask,
+  output [31:0] dcache_l2fifo_wdata,
+  input         l2fifo_dc_ready,
+
+  input         l2_resp_valid,
+  input         l2_resp_error,
+  input [63:0]  l2_resp_rdata,
+  output        resp_ready,
 
   input         l2_inv_valid,
   input [31:6]  l2_inv_addr,
-  output        dcache_l2_inv_ready);
+  output        inv_ready);
 
   // 32KB, 4-way associative, 64B line => 128 sets
   function automatic [6:0] addr2set(
@@ -203,17 +204,17 @@ module dcache(
 
   // derived signals
   wire l2_req_beat;
-  assign l2_req_beat = dcache_l2_req & l2_dc_ready;
+  assign l2_req_beat = dcache_l2fifo_req & l2fifo_dc_ready;
 
   wire l2_resp_beat;
-  assign l2_resp_beat = l2_dc_valid & dcache_l2_ready;
+  assign l2_resp_beat = l2_resp_valid & resp_ready;
 
   // mshr_req_* fields are shifted right by 2 on each l2_resp_beat
   wire [1:0] l2req_fwd_valid;
   assign l2req_fwd_valid = mshr_obsolete ? 0 : mshr_req_valid[1:0];
 
   // must stall when there is a higher priority input to stage 2 present
-  assign s1_stall = (s1_req_r | s1_forward_r) & l2_dc_valid & (|l2req_fwd_valid);
+  assign s1_stall = (s1_req_r | s1_forward_r) & l2_resp_valid & (|l2req_fwd_valid);
 
   // lsq interface
   assign dcache_lsq_ready = ~s0_stall & ~l2_inv_valid;
@@ -223,14 +224,16 @@ module dcache(
   assign dcache_lsq_rdata = s2_burst ? {s2_bcmp_result,s2_bcmp_r} : s2_rdata_extended;
 
   // l2 interface
-  assign dcache_l2_ready = ~&l2req_fwd_valid;
-  assign dcache_l2_req = s0_req_r & ~s0_inv_r & pma_valid &
-                         ((~s0_op_r[0] & s0_tagmiss & ~mshr_valid) |
-                          (s0_op_r[0] & (~s0_mshrhit | s0_wr_merge)));
-  assign dcache_l2_addr = ~s0_op_r[0] ? {s0_addr_r[31:6],4'b0} : s0_addr_r[31:2];
-  assign dcache_l2_wen = s0_op_r[0];
-  assign dcache_l2_wmask = s0_wmask;
-  assign dcache_l2_wdata = s0_wdata_aligned;
+  assign dcache_l2fifo_req = s0_req_r & ~s0_inv_r & pma_valid &
+                             ((~s0_op_r[0] & s0_tagmiss & ~mshr_valid) |
+                              (s0_op_r[0] & (~s0_mshrhit | s0_wr_merge)));
+  assign dcache_l2fifo_addr = ~s0_op_r[0] ? {s0_addr_r[31:6],4'b0} : s0_addr_r[31:2];
+  assign dcache_l2fifo_wen = s0_op_r[0];
+  assign dcache_l2fifo_wmask = s0_wmask;
+  assign dcache_l2fifo_wdata = s0_wdata_aligned;
+
+  assign resp_ready = ~&l2req_fwd_valid;
+  assign inv_ready = ~s0_stall;
 
   // s0 input latches
   always @(posedge clk)
@@ -299,7 +302,7 @@ module dcache(
         s0_rd_forward = 1;
       else
         // merge into the mshr if the slot is free and there hasn't been a flush
-        s0_rd_merge = ~l2_dc_valid & ~rbuf_started & ~mshr_req_valid[s0_addr_r[5:2]] &
+        s0_rd_merge = ~l2_resp_valid & ~rbuf_started & ~mshr_req_valid[s0_addr_r[5:2]] &
                       ~mshr_obsolete & ~s0_burst;
 
     // can we merge a write?
@@ -307,7 +310,7 @@ module dcache(
   end
 
   assign s0_mshr_alloc = s0_req_r & ~s0_op_r[0] & pma_valid & s0_tagmiss
-                         & l2_dc_ready & ~mshr_valid;
+                         & l2fifo_dc_ready & ~mshr_valid;
 
   // invalid_way_*
   priarb #(4) invalid_way_arb(
@@ -341,11 +344,11 @@ module dcache(
         if(s0_mshrhit)
           s0_stall = (~s0_rd_forward | s1_stall) & ~s0_rd_merge;
         else if(s0_tagmiss)
-          s0_stall = pma_valid & (~l2_dc_ready | mshr_valid);
+          s0_stall = pma_valid & (~l2fifo_dc_ready | mshr_valid);
         else
           s0_stall = s1_stall;
       else
-        s0_stall = ~l2_dc_ready | (s0_mshrhit & ~s0_wr_merge);
+        s0_stall = ~l2fifo_dc_ready | (s0_mshrhit & ~s0_wr_merge);
   end
 
   assign s0_op = s0_burst ? {s0_last,2'b11} : s0_op_r[3:1];
@@ -353,7 +356,7 @@ module dcache(
   wire s0_wen;
   assign s0_wen = s0_req_r & ~s0_inv_r & s0_op_r[0] &
                   (~s0_tagmiss | (s0_mshrhit & ~rbuf_filled[s0_addr_r[5:3]])) &
-                  l2_dc_ready;
+                  l2fifo_dc_ready;
 
   pmacheck pmacheck(
     .addr(s0_addr_r[31:6]),
@@ -438,20 +441,20 @@ module dcache(
     if(rst | lsq_dc_flush)
       s2_req_r <= 0;
     else begin
-      if(l2_dc_valid & l2req_fwd_valid[0]) begin
+      if(l2_resp_valid & l2req_fwd_valid[0]) begin
         s2_req_r <= 1;
         s2_error_r <= 0;
         s2_offset_r <= {1'b0,mshr_req_offset[1:0]};
         s2_lsqid_r <= mshr_req_lsqid[3:0];
         s2_op_r <= mshr_req_op[2:0];
-        s2_rdata_r <= l2_rdata;
-      end else if(l2_dc_valid & l2req_fwd_valid[1]) begin
+        s2_rdata_r <= l2_resp_rdata;
+      end else if(l2_resp_valid & l2req_fwd_valid[1]) begin
         s2_req_r <= 1;
         s2_error_r <= 0;
         s2_offset_r <= {1'b1,mshr_req_offset[3:2]};
         s2_lsqid_r <= mshr_req_lsqid[7:4];
         s2_op_r <= mshr_req_op[5:3];
-        s2_rdata_r <= l2_rdata;
+        s2_rdata_r <= l2_resp_rdata;
       end else if(s1_forward_r | s1_req_r) begin
         s2_req_r <= 1;
         s2_error_r <= s1_error_r;
@@ -564,8 +567,8 @@ module dcache(
         mshr_wmask[s0_addr_r[5:2]*4+:4] <= mshr_wmask[s0_addr_r[5:2]*4+:4] | s0_wmask;
       end
 
-      if(l2_dc_valid) begin
-        if(dcache_l2_ready) begin
+      if(l2_resp_valid) begin
+        if(resp_ready) begin
           mshr_req_valid <= {2'b0,mshr_req_valid[15:2]};
           mshr_req_offset <= {4'b0,mshr_req_offset[31:4]};
           mshr_req_op <= {6'b0,mshr_req_op[47:6]};
@@ -599,7 +602,7 @@ module dcache(
         rbuf_started <= 1;
         rbuf_tail <= rbuf_tail + 1;
         rbuf_valid <= {rbuf_valid[6:0],1'b1};
-        rbuf_data[rbuf_tail[2:0]] <= l2_rdata;
+        rbuf_data[rbuf_tail[2:0]] <= l2_resp_rdata;
       end
 
       if(~s0_wen & fill_wen) begin
