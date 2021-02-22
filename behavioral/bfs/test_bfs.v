@@ -70,23 +70,31 @@ module test_bfs;
     $dumpfile("top.vcd");
     $dumpvars;
     $dumplimit(32*1024*1024);
+
+    if (!$value$plusargs("from=%d", from_node)) 
+      from_node = 32'h00C0; // Node 3: base_addr = 0
+    if (!$value$plusargs("to=%d", to_node)) 
+      to_node = 32'h0080; // Node 2: base_addr = 0
+
     clk = 0;
     rst = 1;
     #30;
-    rst = 0;
+
+    rst = 0; // Run
     bfs_write = 1;
     bfs_rd = 14;
     bfs_robid = 65;
-    from_node = 32'h00C0; // Node 3: base_addr = 0
-    to_node = 32'h0080; // Node 2: base_addr = 0
-    #30;
+    #20;
+
+    bfs_write = 0; // Not run
     bfs_rd = 7;
     bfs_robid = 3;
     from_node = 32'h0100;
     to_node = 32'h0180;
-    #30;
-    bfs_write = 0;
-    #1000;
+    @(posedge wb_valid);
+    #100;
+
+    $finish;
   end
 
 endmodule

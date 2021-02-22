@@ -4,8 +4,8 @@
 #include <stdbool.h>
 #include <inttypes.h>
 
-#define G_SIZE 40
-#define EDGE_CT 60
+#define G_SIZE 60
+#define EDGE_CT 100
 #define N_MAX 13
 
 typedef struct Node_t {
@@ -169,7 +169,7 @@ uint32_t bfs_reachable(struct Graph* graph, Node* from, Node* to) {
     return 1;
   }
   else {
-    printf("No solution");
+    printf("No solution from %u to %u\n", getNodeId(graph, from), getNodeId(graph, to));
     return 0;
   }
 }
@@ -195,10 +195,10 @@ void create_memfile(uint32_t base_addr, struct Graph* graph) {
 
 
 
-int main (void) {
+int main (int argc, char *argv[]) {
   struct Graph graph;
   srand(time(NULL));
-  
+
   uint32_t edge_ct = 0;
 
   create_graph(&graph, G_SIZE);
@@ -216,12 +216,21 @@ int main (void) {
     }
   }
   print_graph(&graph);
-  create_memfile(0, &graph);
-
   printf("Edge Count: %u\n", edge_ct);
 
-  Node* from = graph.nodes + 3;
-  Node* to = graph.nodes + 2;
+  create_memfile(0, &graph);
+  
+  Node* from;
+  Node* to;
+  if (argc > 2) {
+    from = graph.nodes + atoi(argv[1]);
+    to = graph.nodes + atoi(argv[2]);
+  }
+  else {
+    from = graph.nodes + 3;
+    to = graph.nodes + 2;
+  }
+
   bfs_reachable(&graph, from, to);
 
   free_graph(&graph);
