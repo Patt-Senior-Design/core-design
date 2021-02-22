@@ -78,7 +78,7 @@ module bfs_core (
   end
 
 
-  // Cache 
+  // Cache
   assign bfs_dc_req = deq_req;
   assign bfs_dc_addr = deq_data;
 
@@ -89,15 +89,18 @@ module bfs_core (
   reg[1:0] state;
   reg[1:0] next_state;
   
+  wire marked = dc_rdata[63];
+  wire [3:0] rdata_neigh_ct = dc_rdata[32+:4];
+
   wire init_add_neighs; // If it has neighbors, unmarked, and frame start
-  assign init_add_neighs = (|dc_rdata[32+:4] & ~dc_rdata[0] & dc_fs);
+  assign init_add_neighs = (|rdata_neigh_ct & ~marked & dc_fs);
   
   wire last_neigh_iter; // Either 1 or 2 neighs left
   assign last_neigh_iter = (~|neigh_ct[3:2] & ~(neigh_ct[1] & neigh_ct[0]));
 
   //assign found = ~q_empty & (deq_data == to_node);
   wire done;
-  assign done = (q_empty & dc_rbuf_empty) & (state == NODE_HEADER);
+  assign done = (q_empty & dc_rbuf_empty);
 
   always @(posedge clk) begin
     if (rst | rob_flush) begin
@@ -134,7 +137,7 @@ module bfs_core (
         q_rst = 0;
         enq_req = 2'b00;
         // Next
-        next_neigh_ct = dc_rdata[32+:4];
+        next_neigh_ct = rdata_neigh_ct;
         next_state = (done ? IDLE : (init_add_neighs ? ADD_NEIGHS : NODE_HEADER));
       end
       ADD_NEIGHS: begin

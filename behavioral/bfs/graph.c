@@ -5,7 +5,7 @@
 #include <inttypes.h>
 
 #define G_SIZE 40
-#define EDGE_CT 90
+#define EDGE_CT 60
 #define N_MAX 13
 
 typedef struct Node_t {
@@ -221,7 +221,7 @@ int main (void) {
   printf("Edge Count: %u\n", edge_ct);
 
   Node* from = graph.nodes + 3;
-  Node* to = graph.nodes + 5;
+  Node* to = graph.nodes + 2;
   bfs_reachable(&graph, from, to);
 
   free_graph(&graph);
