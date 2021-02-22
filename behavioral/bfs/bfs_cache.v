@@ -32,10 +32,13 @@ module bfs_cache (
   wire[9:0] acc_addr;
   assign acc_addr = (addr_base >> 2) + (8 - counter)*2;
 
+  wire [32:0] node_n = bfs_dc_addr >> 6;
+
   reg req;
   reg [31:0] addr_base;
   reg [3:0] counter;
   reg [63:0] rdata;
+  reg transfer;
 
   always @(posedge clk) begin
     if (rst) begin
@@ -43,7 +46,7 @@ module bfs_cache (
       counter <= 0;
     end else begin
       req <= bfs_dc_req;
-
+      
       if (~ready | counter[0]) begin
         counter <= counter - 1;
         rdata <= {storage[acc_addr + 1], storage[acc_addr]}; // Get 8 bytes
@@ -55,10 +58,12 @@ module bfs_cache (
         counter <= 8;
         addr_base <= bfs_dc_addr;
       end
+      
     end
+    transfer <= |counter;
   end
 
-  assign dc_rbuf_empty = ~req & (~|counter);
+  assign dc_rbuf_empty = ~req & ~transfer;
   assign dc_ready = ready;
   assign dc_fs = &counter[2:0];
   assign dc_rdata = rdata;
