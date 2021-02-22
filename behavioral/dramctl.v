@@ -29,7 +29,7 @@ module dramctl(
 
   reg cmd_relevant, cmd_write;
   always @(*) begin
-    cmd_relevant = bus_valid & ~bus_nack & ~bus_hit &
+    cmd_relevant = bus_valid & ~bus_nack & (~bus_hit | (bus_cmd == `CMD_FLUSH)) &
                    ({bus_addr,4'b0} >= RAM_BASE) &
                    ({bus_addr,4'b0} < (RAM_BASE+RAM_SIZE));
     case(bus_cmd)

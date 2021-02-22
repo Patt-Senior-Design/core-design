@@ -25,8 +25,9 @@ module l2(
   output [63:0] l2_rdata,
   input         dcache_l2_ready,
 
-  output        l2_invalidate,
-  output [31:6] l2_iaddr,
+  output        l2_inv_valid,
+  output [31:6] l2_inv_addr,
+  input         dcache_l2_inv_ready,
 
   // bus interface
   output        l2_bus_req,
@@ -47,6 +48,7 @@ module l2(
 
   /*AUTOWIRE*/
   // Beginning of automatic wires (for undeclared instantiated-module outputs)
+  wire        l2data_flush_hit;
   wire [31:6] l2data_req_addr;
   wire [2:0]  l2data_req_cmd;
   wire [63:0] l2data_req_data;
@@ -63,6 +65,8 @@ module l2(
   wire [31:0] l2reqfifo_wdata;
   wire        l2reqfifo_wen;
   wire [3:0]  l2reqfifo_wmask;
+  wire [31:6] l2tag_inv_addr;
+  wire        l2tag_inv_valid;
   wire        l2tag_l2reqfifo_ready;
   wire [31:3] l2tag_req_addr;
   wire [2:0]  l2tag_req_cmd;
@@ -79,6 +83,7 @@ module l2(
   wire [3:0]  l2tag_snoop_way;
   wire [63:0] l2tag_snoop_wdata;
   wire        l2tag_snoop_wen;
+  wire        l2trans_flush_hit;
   wire        l2trans_l2data_req_ready;
   wire        l2trans_l2data_snoop_ready;
   wire [2:0]  l2trans_tag;
@@ -113,8 +118,8 @@ module l2(
     // Outputs
     .l2_bus_hit       (l2_bus_hit),
     .l2_bus_nack      (l2_bus_nack),
-    .l2_iaddr         (l2_iaddr),
-    .l2_invalidate    (l2_invalidate),
+    .l2tag_inv_addr   (l2tag_inv_addr[31:6]),
+    .l2tag_inv_valid  (l2tag_inv_valid),
     .l2tag_l2reqfifo_ready(l2tag_l2reqfifo_ready),
     .l2tag_req_addr   (l2tag_req_addr[31:3]),
     .l2tag_req_cmd    (l2tag_req_cmd[2:0]),
@@ -139,6 +144,8 @@ module l2(
     .bus_tag          (bus_tag),
     .bus_valid        (bus_valid),
     .clk              (clk),
+    .invfifo_ready    (invfifo_ready),
+    .l2data_flush_hit (l2data_flush_hit),
     .l2data_req_ready (l2data_req_ready),
     .l2data_snoop_ready(l2data_snoop_ready),
     .l2reqfifo_addr   (l2reqfifo_addr[31:2]),
@@ -147,6 +154,7 @@ module l2(
     .l2reqfifo_wdata  (l2reqfifo_wdata[31:0]),
     .l2reqfifo_wen    (l2reqfifo_wen),
     .l2reqfifo_wmask  (l2reqfifo_wmask[3:0]),
+    .l2trans_flush_hit(l2trans_flush_hit),
     .l2trans_tag      (l2trans_tag[2:0]),
     .l2trans_valid    (l2trans_valid),
     .rst              (rst));
@@ -158,6 +166,7 @@ module l2(
     .l2_error       (l2_error),
     .l2_ic_valid    (l2_ic_valid),
     .l2_rdata       (l2_rdata),
+    .l2data_flush_hit(l2data_flush_hit),
     .l2data_req_addr(l2data_req_addr[31:6]),
     .l2data_req_cmd (l2data_req_cmd[2:0]),
     .l2data_req_data(l2data_req_data[63:0]),
@@ -171,6 +180,8 @@ module l2(
     // Inputs
     .clk            (clk),
     .dcache_l2_ready(dcache_l2_ready),
+    .l2tag_inv_addr (l2tag_inv_addr[31:6]),
+    .l2tag_inv_valid(l2tag_inv_valid),
     .l2tag_req_addr (l2tag_req_addr[31:3]),
     .l2tag_req_cmd  (l2tag_req_cmd[2:0]),
     .l2tag_req_cmd_valid(l2tag_req_cmd_valid),
@@ -198,17 +209,14 @@ module l2(
     .l2_bus_data          (l2_bus_data),
     .l2_bus_req           (l2_bus_req),
     .l2_bus_tag           (l2_bus_tag),
+    .l2trans_flush_hit    (l2trans_flush_hit),
     .l2trans_l2data_req_ready(l2trans_l2data_req_ready),
     .l2trans_l2data_snoop_ready(l2trans_l2data_snoop_ready),
     .l2trans_tag          (l2trans_tag[2:0]),
     .l2trans_valid        (l2trans_valid),
     // Inputs
-    .bus_addr             (bus_addr),
-    .bus_cmd              (bus_cmd),
     .bus_l2_grant         (bus_l2_grant),
     .bus_nack             (bus_nack),
-    .bus_tag              (bus_tag),
-    .bus_valid            (bus_valid),
     .clk                  (clk),
     .l2data_req_addr      (l2data_req_addr[31:6]),
     .l2data_req_cmd       (l2data_req_cmd[2:0]),
@@ -218,6 +226,18 @@ module l2(
     .l2data_snoop_data    (l2data_snoop_data[63:0]),
     .l2data_snoop_tag     (l2data_snoop_tag[4:0]),
     .l2data_snoop_valid   (l2data_snoop_valid),
+    .l2tag_inv_addr       (l2tag_inv_addr[31:6]),
+    .l2tag_inv_valid      (l2tag_inv_valid),
     .rst                  (rst));
+
+  fifo #(26,8) invfifo(
+    .clk(clk),
+    .rst(rst),
+    .wr_valid(l2tag_inv_valid),
+    .wr_ready(invfifo_ready),
+    .wr_data(l2tag_inv_addr),
+    .rd_valid(l2_inv_valid),
+    .rd_ready(dcache_l2_inv_ready),
+    .rd_data(l2_inv_addr));
 
 endmodule

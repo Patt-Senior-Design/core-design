@@ -76,7 +76,7 @@ static void write_cb(tag_t tag, uint64_t addr) {
 }
 
 static PLI_INT32 get_scalar(vpiHandle handle) {
-  s_vpi_value vpi_value = {vpiScalar};
+  s_vpi_value vpi_value = {vpiScalarVal};
   vpi_get_value(handle, &vpi_value);
   return vpi_value.value.scalar;
 }

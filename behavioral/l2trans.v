@@ -17,6 +17,10 @@ module l2trans(
   output            l2trans_l2data_snoop_ready,
 
   // l2tag interface
+  input             l2tag_inv_valid,
+  input [31:6]      l2tag_inv_addr,
+  output            l2trans_flush_hit,
+
   output            l2trans_valid,
   output [2:0]      l2trans_tag,
 
@@ -28,12 +32,7 @@ module l2trans(
   output reg [63:0] l2_bus_data,
   input             bus_l2_grant,
 
-  // we have to examine the current cmd as well
-  input             bus_valid,
-  input             bus_nack,
-  input [2:0]       bus_cmd,
-  input [4:0]       bus_tag,
-  input [31:6]      bus_addr);
+  input             bus_nack);
 
   // stages of transmitting a bus command:
   // 1. assert bus_req, watch bus_grant
@@ -64,10 +63,10 @@ module l2trans(
   wire          req_flush;
   assign req_flush = req_cmd_r == `CMD_FLUSH;
 
-  wire          req_data_wr_beat, snoop_data_wr_beat;
-  assign req_data_wr_beatt = l2data_req_valid &
-                             (l2trans_l2data_req_ready |
-                              (req_data_index_r != 0));
+  wire req_data_wr_beat, snoop_data_wr_beat;
+  assign req_data_wr_beat = l2data_req_valid & (l2data_req_cmd == `CMD_FLUSH) &
+                            (l2trans_l2data_req_ready |
+                             (req_data_index_r != 0));
   assign snoop_data_wr_beat = l2data_snoop_valid &
                               (l2trans_l2data_snoop_ready |
                                (snoop_data_index_r != 0));
@@ -76,12 +75,15 @@ module l2trans(
   assign req_data_rd_beat = req_valid_r & req_sent_r & req_flush;
   assign snoop_data_rd_beat = snoop_valid_r & snoop_sent_r;
 
-  wire          upgr_conflict;
-  assign upgr_conflict = req_valid_r & ~snoop_valid_r &
-                         (req_cmd_r == `CMD_BUSUPGR) &
-                         bus_valid & ~bus_nack &
-                         ((bus_cmd == `CMD_BUSUPGR) | (bus_cmd == `CMD_BUSRDX)) &
-                         (bus_addr == req_addr_r);
+  wire inv_hit;
+  assign inv_hit = l2tag_inv_valid & req_valid_r &
+                   (l2tag_inv_addr == req_addr_r);
+
+  wire flush_hit;
+  assign flush_hit = inv_hit & (req_cmd_r == `CMD_FLUSH);
+
+  wire upgr_hit;
+  assign upgr_hit = l2tag_inv_valid & inv_hit & (req_cmd_r == `CMD_BUSUPGR);
 
   // l2data interface
   assign l2trans_l2data_req_ready = ~req_valid_r |
@@ -91,6 +93,8 @@ module l2trans(
                                       (snoop_sent_r & (bus_cycle_r == 7));
 
   // l2tag interface
+  assign l2trans_flush_hit = flush_hit;
+
   assign l2trans_valid = req_valid_r & req_sent_r &
                          ~bus_nack & (bus_cycle_r == 7);;
   assign l2trans_tag = req_tag_r;
@@ -102,16 +106,16 @@ module l2trans(
                        snoop_data_ready_r);
 
   always @(*)
-    if(snoop_valid_r) begin
+    if(snoop_valid_r & snoop_sent_r) begin
       l2_bus_cmd = `CMD_FLUSH;
       l2_bus_tag = snoop_tag_r;
       l2_bus_addr = snoop_addr_r;
-      l2_bus_data = req_data[req_data_index_r[2:0]];
+      l2_bus_data = snoop_data[snoop_data_index_r];
     end else begin
-      l2_bus_cmd = upgr_conflict ? `CMD_BUSRDX : req_cmd_r;
+      l2_bus_cmd = upgr_hit ? `CMD_BUSRDX : req_cmd_r;
       l2_bus_tag = {`BUSID_L2,req_tag_r};
       l2_bus_addr = req_addr_r;
-      l2_bus_data = snoop_data[snoop_data_index_r[2:0]];
+      l2_bus_data = req_data[req_data_index_r];
     end
 
   // bus_cycle_r
@@ -131,9 +135,12 @@ module l2trans(
         req_cmd_r <= l2data_req_cmd;
         req_addr_r <= l2data_req_addr;
       end
-    end else if(req_valid_r & ~snoop_valid_r &
-                bus_l2_grant & (bus_cycle_r == 7))
-      req_sent_r <= 1;
+    end else begin
+      if(req_valid_r & ~snoop_valid_r & bus_l2_grant & (bus_cycle_r == 7))
+        req_sent_r <= 1;
+      if(upgr_hit)
+        req_cmd_r <= `CMD_BUSRDX;
+    end
 
   always @(posedge clk)
     if(rst) begin
@@ -148,6 +155,10 @@ module l2trans(
         req_data_ready_r <= 0;
       req_data_index_r <= req_data_index_r + 1;
     end
+
+  always @(posedge clk)
+    if(req_data_wr_beat)
+      req_data[req_data_index_r] <= l2data_req_data;
 
   always @(posedge clk)
     if(rst)
@@ -182,5 +193,9 @@ module l2trans(
         snoop_data_ready_r <= 0;
       snoop_data_index_r <= snoop_data_index_r + 1;
     end
+
+  always @(posedge clk)
+    if(snoop_data_wr_beat)
+      snoop_data[snoop_data_index_r] <= l2data_snoop_data;
 
 endmodule

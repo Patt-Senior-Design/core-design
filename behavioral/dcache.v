@@ -27,8 +27,10 @@ module dcache(
   input         l2_dc_valid,
   input         l2_error,
   input [63:0]  l2_rdata,
-  input         l2_invalidate,
-  input [31:6]  l2_iaddr);
+
+  input         l2_inv_valid,
+  input [31:6]  l2_inv_addr,
+  output        dcache_l2_inv_ready);
 
   // 32KB, 4-way associative, 64B line => 128 sets
   function automatic [6:0] addr2set(
@@ -97,6 +99,7 @@ module dcache(
 
   // stage 0 latches
   reg        s0_req_r;
+  reg        s0_inv_r;
   reg [3:0]  s0_op_r;
   reg [31:0] s0_addr_r;
   reg [3:0]  s0_lsqid_r;
@@ -213,7 +216,7 @@ module dcache(
   assign s1_stall = (s1_req_r | s1_forward_r) & l2_dc_valid & (|l2req_fwd_valid);
 
   // lsq interface
-  assign dcache_lsq_ready = ~s0_stall;
+  assign dcache_lsq_ready = ~s0_stall & ~l2_inv_valid;
   assign dcache_lsq_valid = s2_req_r & s2_last & ~lsq_dc_flush;
   assign dcache_lsq_error = s2_error_r;
   assign dcache_lsq_lsqid = s2_lsqid_r;
@@ -221,7 +224,7 @@ module dcache(
 
   // l2 interface
   assign dcache_l2_ready = ~&l2req_fwd_valid;
-  assign dcache_l2_req = s0_req_r & pma_valid &
+  assign dcache_l2_req = s0_req_r & ~s0_inv_r & pma_valid &
                          ((~s0_op_r[0] & s0_tagmiss & ~mshr_valid) |
                           (s0_op_r[0] & (~s0_mshrhit | s0_wr_merge)));
   assign dcache_l2_addr = ~s0_op_r[0] ? {s0_addr_r[31:6],4'b0} : s0_addr_r[31:2];
@@ -233,9 +236,15 @@ module dcache(
   always @(posedge clk)
     if(rst | (lsq_dc_flush & ~s0_op_r[0]))
       s0_req_r <= 0;
-    else  if(~s0_stall) begin
-      s0_req_r <= lsq_dc_req;
-      if(lsq_dc_req) begin
+    else if(~s0_stall) begin
+      s0_req_r <= lsq_dc_req | l2_inv_valid;
+      s0_inv_r <= l2_inv_valid;
+      if(l2_inv_valid) begin
+        // inhibit s0_rd_forward/s0_rd_merge/s0_mshr_alloc
+        // s0_wr_merge/s0_wen checks s0_req_r explicitly
+        s0_op_r <= 1;
+        s0_addr_r <= {l2_inv_addr,6'b0};
+      end else if(lsq_dc_req) begin
         s0_op_r <= lsq_dc_op;
         s0_addr_r <= lsq_dc_addr;
         s0_lsqid_r <= lsq_dc_lsqid;
@@ -294,7 +303,7 @@ module dcache(
                       ~mshr_obsolete & ~s0_burst;
 
     // can we merge a write?
-    s0_wr_merge = s0_op_r[0] & s0_mshrhit & ~rbuf_filled[s0_addr_r[5:3]];
+    s0_wr_merge = ~s0_inv_r & s0_op_r[0] & s0_mshrhit & ~rbuf_filled[s0_addr_r[5:3]];
   end
 
   assign s0_mshr_alloc = s0_req_r & ~s0_op_r[0] & pma_valid & s0_tagmiss
@@ -326,6 +335,8 @@ module dcache(
     if(s0_req_r)
       if(s0_burst & ~s0_last)
         s0_stall = pma_valid;
+      else if(s0_inv_r)
+        s0_stall = s0_mshrhit;
       else if(~s0_op_r[0])
         if(s0_mshrhit)
           s0_stall = (~s0_rd_forward | s1_stall) & ~s0_rd_merge;
@@ -340,7 +351,7 @@ module dcache(
   assign s0_op = s0_burst ? {s0_last,2'b11} : s0_op_r[3:1];
 
   wire s0_wen;
-  assign s0_wen = s0_req_r & s0_op_r[0] &
+  assign s0_wen = s0_req_r & ~s0_inv_r & s0_op_r[0] &
                   (~s0_tagmiss | (s0_mshrhit & ~rbuf_filled[s0_addr_r[5:3]])) &
                   l2_dc_ready;
 
@@ -388,7 +399,7 @@ module dcache(
       s1_wen_r <= 0;
     end else if(~s1_stall) begin
       s1_req_r <= s0_req_r & ~s0_op_r[0] & ~s0_mshrhit & ~s0_tagmiss & ~lsq_dc_flush;
-      s1_forward_r <= s0_req_r & (s0_rd_forward | ~pma_valid) & ~lsq_dc_flush;
+      s1_forward_r <= s0_req_r & ~s0_inv_r & (s0_rd_forward | ~pma_valid) & ~lsq_dc_flush;
       s1_error_r <= ~pma_valid;
       s1_offset_r <= s0_addr_r[2:0];
       s1_op_r <= s0_op;
@@ -499,9 +510,11 @@ module dcache(
         tagmem_valid[addr2set({mshr_addr,4'b0})][oh2idx(mshr_way)] <= 1;
       else if(~s0_wen & fill_wen)
         tagmem_valid[addr2set({mshr_addr,4'b0})][oh2idx(mshr_way)] <= 0;
+      else if(s0_req_r & s0_inv_r & ~s0_mshrhit & ~s0_tagmiss)
+        tagmem_valid[addr2set(s0_addr_r[31:2])][oh2idx(s0_taghits)] <= 0;
 
       // lru bits
-      if(s0_req_r & ~s0_mshrhit) begin
+      if(s0_req_r & ~s0_inv_r & ~s0_mshrhit) begin
         if(~s0_tagmiss)
           tagmem_lru[s0_set] <= next_lru(s0_taghits, tagmem_lru[s0_set]);
         else if(s0_mshr_alloc)
