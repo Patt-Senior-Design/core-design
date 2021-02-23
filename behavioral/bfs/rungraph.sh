@@ -22,7 +22,7 @@ fi
 make -C $DIR || exit $?
 
 # C Graph run 
-./graph $FROM_NODE $TO_NODE | tee graph.out
+./graph_test/graph $FROM_NODE $TO_NODE | tee graph.out
 GRAPHPID=$!
 if [ $? -eq 124 ]; then
   exit 1
