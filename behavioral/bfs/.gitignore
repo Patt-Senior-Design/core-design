@@ -1,0 +1,5 @@
+*.vcd
+top_bfs
+*.mem
+*.out
+*.o
