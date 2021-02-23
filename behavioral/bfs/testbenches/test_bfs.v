@@ -71,10 +71,13 @@ module test_bfs;
     $dumpvars;
     $dumplimit(32*1024*1024);
 
-    if (!$value$plusargs("from=%d", from_node)) 
+    if (!$value$plusargs("from=%d", from_node) || !$value$plusargs("to=%d", to_node)) begin
       from_node = 32'h00C0; // Node 3: base_addr = 0
-    if (!$value$plusargs("to=%d", to_node)) 
       to_node = 32'h0080; // Node 2: base_addr = 0
+    end else begin
+      from_node = from_node << 6;
+      to_node = to_node << 6;
+    end
 
     clk = 0;
     rst = 1;

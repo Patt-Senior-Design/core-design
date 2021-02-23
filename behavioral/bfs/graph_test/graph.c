@@ -4,8 +4,8 @@
 #include <stdbool.h>
 #include <inttypes.h>
 
-#define G_SIZE 60
-#define EDGE_CT 100
+#define G_SIZE 600
+#define EDGE_CT 2*G_SIZE
 #define N_MAX 13
 
 typedef struct Node_t {
@@ -78,6 +78,7 @@ void free_graph(struct Graph* graph) {
 
 
 int is_neighbor(Node* from, Node* to) {
+  if (from == to) return 0;
   for (int i = 0; i < from->neigh_ct; i++)
     if (from->neighbors[i] == to)
       return 1;
@@ -87,17 +88,19 @@ int is_neighbor(Node* from, Node* to) {
 
 typedef struct Queue_t {
   uint32_t head, tail;
-  Node* val[G_SIZE];
+  uint32_t enq_ct;
+  Node* val[N_MAX * G_SIZE];
 } Queue;
 
-void create_queue(Queue* q) {
-  q->head = q->tail = 0;
+void reset_queue(Queue* q) {
+  q->head = q->tail = q->enq_ct = 0;
 }
 
 void enqueue(Queue* q, Node* val) {
   q->val[q->tail++] = val;
   if (q->tail == G_SIZE)
     q->tail = 0;
+  q->enq_ct++;
 }
 
 int dequeue(Queue* q, Node** val) {
@@ -110,7 +113,7 @@ int dequeue(Queue* q, Node** val) {
 
 
 void init_bfs(struct Graph* graph, Queue* q, Node* from) {
-  create_queue(q);
+  reset_queue(q);
   enqueue(q, from);
   // Mark all nodes as unvisited
   for (int i = 0; i < graph->size; i++) {
@@ -118,7 +121,6 @@ void init_bfs(struct Graph* graph, Queue* q, Node* from) {
     cur_node->marked = 0;
     cur_node->parent = cur_node;
   }
-  from->marked = 1;
 }
 
 
@@ -131,27 +133,28 @@ uint32_t bfs_reachable(struct Graph* graph, Node* from, Node* to) {
   int found = 0;
   // Remove front of queue
   while (dequeue(&bfs_q, &cur_node)) {
-    uint32_t cur_node_id = getNodeId(graph, cur_node);
     // Found destination
     if (cur_node == to) {
       found = 1;
-      break;
     }
-    uint32_t count = cur_node->neigh_ct;
-    //printf("Cur Node: %d, Neigh_Ct: %d\n", cur_node_id, count);
-    Node** neighbors = cur_node->neighbors;
-    for (int i = 0; i < count; i++) {
-      Node* cur_neigh = neighbors[i];
-      // If not visited, add neighbors to queue
-      if (!cur_neigh->marked) {
+    // If cur node marked, skip node
+    if (!cur_node->marked) {
+      uint32_t count = cur_node->neigh_ct;
+      Node** neighbors = cur_node->neighbors;
+      // Add neighbors to queue
+      for (int i = 0; i < count; i++) {
+        Node* cur_neigh = neighbors[i];
         enqueue(&bfs_q, cur_neigh);
-        cur_neigh->parent = cur_node;
+        // Add node as parent if neighbor isn't explored
+        if (cur_neigh->parent == cur_neigh)
+          cur_neigh->parent = cur_node;
       }
-      // Mark node as visited
-      cur_neigh->marked = 1;
+      // Mark current node
+      cur_node->marked = 1;
     }
   }
 
+  printf("Enqueued Count: %u\n", bfs_q.enq_ct);
   // Get the path
   if (found) {
     uint32_t path[G_SIZE];

@@ -11,7 +11,10 @@ module bfs_cache (
   output dc_fs,
   output [63:0] dc_rdata);
 
-  reg [31:0] storage [0:1023]; // Store 4-Byte elements. 12-bit (4096) address space, byte-addressable
+  localparam 
+    ADDR_BITS = 17;
+
+  reg [31:0] storage [0:(1<<(ADDR_BITS-2))-1]; // Address Space 17-bit (15+2), 2^11 nodes
   integer i, fd;
 
   initial begin
@@ -29,10 +32,16 @@ module bfs_cache (
   wire ready;
   assign ready = ~|counter[3:1];
 
-  wire[9:0] acc_addr;
+  wire[30:0] acc_addr;
   assign acc_addr = (addr_base >> 2) + (8 - counter)*2;
 
-  wire [32:0] node_n = bfs_dc_addr >> 6;
+  // DEBUGGING
+  wire [32:0] node = bfs_dc_addr >> 6;
+  reg [30:0] deq_ct;
+  always @(posedge clk) begin
+    if (rst) deq_ct <= 0;
+    else if (bfs_dc_req) deq_ct <= deq_ct + 1;
+  end
 
   reg req;
   reg [31:0] addr_base;
