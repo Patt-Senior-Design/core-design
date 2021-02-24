@@ -25,16 +25,19 @@ module bfs_queue #(
     if (bfs_rst) begin 
       buf_valid0 <= 0;
       buf_valid1 <= 0;
-    end else if (dequeue_req & ~queue_empty) begin  // Dequeuing
-      buf_valid0[buf_head] <= 0;
-      if (head_single)
-        buf_valid1[buf_head] <= 0; 
-    end
-    // Enqueuing happens along with bfs_rst for initial insertion of from node
-    if (|enqueue_req & (~queue_full | bfs_rst)) begin
-      {buf_valid0[enq_idx], buf_valid1[enq_idx]} <= enqueue_req;
-      buf_addr0[enq_idx] <= wdata_in[63:32];
-      buf_addr1[enq_idx] <= wdata_in[31:0];
+    end else begin
+      // Dequeuing
+      if (dequeue_req & ~queue_empty) begin
+        buf_valid0[buf_head] <= 0;
+        if (head_single)
+          buf_valid1[buf_head] <= 0;
+      end
+      // Enqueuing
+      if (|enqueue_req & ~queue_full) begin
+        {buf_valid0[buf_tail], buf_valid1[buf_tail]} <= enqueue_req;
+        buf_addr0[buf_tail] <= wdata_in[63:32];
+        buf_addr1[buf_tail] <= wdata_in[31:0];
+      end
     end
   end
 
@@ -54,7 +57,7 @@ module bfs_queue #(
   always @(posedge clk) begin
     if (bfs_rst) begin
       {buf_head_pol, buf_head} <= 0;
-      {buf_tail_pol, buf_tail} <= |enqueue_req ? 1 : 0; // Initial insertion of from node
+      {buf_tail_pol, buf_tail} <= 0;
     end else begin
       {buf_head_pol, buf_head} <= buf_head_next;
       {buf_tail_pol, buf_tail} <= buf_tail_next;

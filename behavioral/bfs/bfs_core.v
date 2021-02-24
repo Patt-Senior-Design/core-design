@@ -38,15 +38,15 @@ module bfs_core (
     ADD_NEIGHS = 2'b11;
 
   // Queue interface
-  reg q_rst;
+  wire q_rst;
   reg [1:0] enq_req;
   reg [63:0] enq_data;
-
   wire deq_req;
-  assign deq_req = (~q_empty & dc_ready);// & (state !== IDLE) & (state !== INIT));
-
   wire [31:0] deq_data;
   wire q_full, q_empty;
+
+  assign q_rst = rst | done;
+  assign deq_req = (~q_empty & dc_ready);
 
   bfs_queue q (
     .clk (clk),
@@ -100,7 +100,7 @@ module bfs_core (
 
   //assign found = ~q_empty & (deq_data == to_node);
   wire done;
-  assign done = (q_empty & dc_rbuf_empty);
+  assign done = (q_empty & dc_rbuf_empty & (state == NODE_HEADER | state == ADD_NEIGHS));
 
   always @(posedge clk) begin
     if (rst | rob_flush) begin
@@ -113,20 +113,20 @@ module bfs_core (
       neigh_ct <= next_neigh_ct;
       if (~q_empty & (deq_data == to_node))
         found <= 1;
+      if (state == INIT)
+        found <= 0;
     end
   end 
 
   always @(*) begin
     casez(state)
       IDLE: begin
-        q_rst = 0;
         enq_req = 2'b00;
         next_neigh_ct = 4'b0;
         next_state = (rename_bfs_write ? INIT : IDLE);
       end
       INIT: begin
         // Queue init: Insert from_node
-        q_rst = 1;
         enq_req = 2'b01;
         enq_data = {32'b0, from_node};
         // Next
@@ -134,14 +134,12 @@ module bfs_core (
         next_state = NODE_HEADER;
       end
       NODE_HEADER: begin
-        q_rst = 0;
         enq_req = 2'b00;
         // Next
         next_neigh_ct = rdata_neigh_ct;
         next_state = (done ? IDLE : (init_add_neighs ? ADD_NEIGHS : NODE_HEADER));
       end
       ADD_NEIGHS: begin
-        q_rst = 0;
         enq_req = {|neigh_ct[3:1], 1'b1};
         enq_data = dc_rdata;
         // Next
