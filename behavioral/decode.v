@@ -141,7 +141,7 @@ module decode(
   assign decode_rob_valid = valid & ~rename_stall;
   assign decode_error = error | fmt_inv;
   assign decode_ecause = error ? (addr[1] ? ERR_IALIGN : ERR_IFAULT) : ERR_IILLEGAL;
-  assign decode_retop = {fmt_b,funct3[0],insn_jalr,fmt_s,funct3};
+  assign decode_retop = {fmt_b,insn_csr,insn_jalr,fmt_s,funct3};
   assign decode_bptag = bptag;
   assign decode_bptaken = bptaken;
 

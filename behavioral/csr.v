@@ -22,8 +22,8 @@ module csr(
   // rob interface
   input         rob_flush,
   input         rob_ret_valid,
+  input         rob_ret_csr,
   input         rob_csr_valid,
-  input [6:0]   rob_csr_head,
   input [31:2]  rob_csr_epc,
   input [4:0]   rob_csr_ecause,
   input [31:0]  rob_csr_tval,
@@ -83,10 +83,12 @@ module csr(
     op <= rename_op[2:0];
     rd <= rename_rd;
     op1 <= rename_op1;
-    if (rename_csr_write)
-      robid <= rename_robid;
+    robid <= rename_robid;
+    if (rename_csr_write) 
       addr <= rename_imm[11:0];
   end
+
+
 
   // address decoder
   reg sel_mcycle, sel_mcycleh;
@@ -145,12 +147,13 @@ module csr(
     end
   end
 
+  wire inc_minstret;
+  assign inc_minstret = rob_ret_valid & ~(rob_ret_csr & (addr === MINSTRET));
   // Update CSR logic
   always @(*) begin
     // Passive updates
     {mcycleh_n, mcycle_n} = {mcycleh, mcycle} + 1;
-    {minstreth_n, minstret_n} = {minstreth, minstret} + (rob_ret_valid & (rob_csr_head !== robid) & 
-                            (addr == MINSTRET));
+    {minstreth_n, minstret_n} = {minstreth, minstret} + (inc_minstret);
 
     // Active updates: CSR instructions (overrides passive)
     if(wen)
