@@ -1,5 +1,6 @@
 module bfs_queue #(
-  parameter Q_SIZE = 128
+  parameter MAINQ_SIZE = 128,
+  parameter BUFQ_SIZE = 64
   )(
   input        clk,
   input        bfs_rst,
@@ -12,65 +13,72 @@ module bfs_queue #(
   output       queue_full,
   output       queue_empty);
 
-  reg [31:0]      buf_addr0[Q_SIZE-1:0];
-  reg [31:0]      buf_addr1[Q_SIZE-1:0];
-  reg [Q_SIZE-1:0] buf_valid0;
-  reg [Q_SIZE-1:0] buf_valid1;
 
-  wire [$clog2(Q_SIZE)-1:0] enq_idx;
-  assign enq_idx = bfs_rst ? 0 : buf_tail;
+  // Main Q: Enq from core, deq to core
+  wire [1:0]  mq_enq_req;
+  wire        mq_deq_req;
+  wire [31:0] mq_deq_data;
+  wire       mq_full;
+  wire       mq_empty;
 
-  // Enqueue[0]: low 32 bits of wdata_in; Enqueue[1]: high 32 bits of wdata_in
-  always @(posedge clk) begin
-    if (bfs_rst) begin 
-      buf_valid0 <= 0;
-      buf_valid1 <= 0;
-    end else begin
-      // Dequeuing
-      if (dequeue_req & ~queue_empty) begin
-        buf_valid0[buf_head] <= 0;
-        if (head_single)
-          buf_valid1[buf_head] <= 0;
-      end
-      // Enqueuing
-      if (|enqueue_req & ~queue_full) begin
-        {buf_valid0[buf_tail], buf_valid1[buf_tail]} <= enqueue_req;
-        buf_addr0[buf_tail] <= wdata_in[63:32];
-        buf_addr1[buf_tail] <= wdata_in[31:0];
-      end
-    end
-  end
+  assign mq_enq_req = (~mq_full ? enqueue_req : 2'b00);
+  assign mq_deq_req = (~mq_empty ? dequeue_req : 1'b0);
+
+  queue_main #(.Q_SIZE(MAINQ_SIZE)) main_q (
+    .clk(clk),
+    .bfs_rst(bfs_rst),
+    .enqueue_req (mq_enq_req),
+    .wdata_in (wdata_in),
+    .dequeue_req (mq_deq_req),
+    .rdata_out (mq_deq_data),
+    .queue_full (mq_full),
+    .queue_empty (mq_empty));
 
 
-  wire [$clog2(Q_SIZE):0]  buf_head_next, buf_tail_next;
-  reg [$clog2(Q_SIZE)-1:0] buf_head, buf_tail;
-  reg                     buf_head_pol, buf_tail_pol;
-  wire                    head_single;
-  assign head_single = ~buf_valid0[buf_head] & buf_valid1[buf_head];
+  // Out Q: Enq from core, deq to memory 
+  wire [1:0]  outq_enq_req;
+  wire        outq_deq_req;
+  wire [31:0] outq_deq_data;
+  wire       outq_full;
+  wire       outq_empty;
 
-  assign buf_tail_next = (|enqueue_req & ~queue_full) ? 
-                            {buf_tail_pol, buf_tail} + 1 : {buf_tail_pol, buf_tail};
-  assign buf_head_next = (dequeue_req & ~queue_empty & head_single) ? 
-                            {buf_head_pol, buf_head} + 1 : {buf_head_pol, buf_head};
+  assign outq_enq_req = (mq_full ? enqueue_req : 2'b00);
+  assign outq_deq_req = ~inq_full & ~outq_empty;
 
-  // buf sequencing
-  always @(posedge clk) begin
-    if (bfs_rst) begin
-      {buf_head_pol, buf_head} <= 0;
-      {buf_tail_pol, buf_tail} <= 0;
-    end else begin
-      {buf_head_pol, buf_head} <= buf_head_next;
-      {buf_tail_pol, buf_tail} <= buf_tail_next;
-    end
-  end
+  queue_tw #(.Q_SIZE(BUFQ_SIZE)) out_q (
+    .clk(clk),
+    .bfs_rst(bfs_rst),
+    .enqueue_req (outq_enq_req),
+    .wdata_in (wdata_in),
+    .dequeue_req (outq_deq_req),
+    .rdata_out (outq_deq_data),
+    .queue_full (outq_full),
+    .queue_empty (outq_empty));
 
 
-  wire wraparound = (buf_head_pol ^ buf_tail_pol);
-  wire pt_eq = (buf_head === buf_tail);
+  // In Q: Enq from memory, deq to core
+  wire [1:0]  inq_enq_req;
+  wire        inq_deq_req;
+  wire [31:0] inq_deq_data;
+  wire       inq_full;
+  wire       inq_empty;
 
-  assign rdata_out = buf_valid0[buf_head] ? buf_addr0[buf_head] : buf_addr1[buf_head];
-  assign queue_full = (wraparound & pt_eq);
-  assign queue_empty = (~wraparound & pt_eq);
+  assign inq_enq_req = 0;
+  assign inq_deq_req = 0;
+
+  queue_tw #(.Q_SIZE(BUFQ_SIZE)) in_q (
+    .clk(clk),
+    .bfs_rst(bfs_rst),
+    .enqueue_req (inq_enq_req),
+    .wdata_in (wdata_in),
+    .dequeue_req (inq_deq_req),
+    .rdata_out (inq_deq_data),
+    .queue_full (inq_full),
+    .queue_empty (inq_empty));
 
 
- endmodule 
+  assign queue_full = mq_full;
+  assign queue_empty = mq_empty;
+  assign rdata_out = mq_deq_data;
+
+endmodule 
