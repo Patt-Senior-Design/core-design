@@ -1,3 +1,5 @@
+// Supports dual enqueue and single dequeue
+// Enqueue and dequeue to/from only one row
 module queue_main #(
   parameter Q_SIZE = 128
   )(
@@ -45,7 +47,8 @@ module queue_main #(
   reg [$clog2(Q_SIZE)-1:0] buf_head, buf_tail;
   reg                     buf_head_pol, buf_tail_pol;
   wire                    head_single;
-  assign head_single = ~buf_valid0[buf_head] & buf_valid1[buf_head];
+
+  assign head_single = ~buf_valid0[buf_head];
 
   assign buf_tail_next = (|enqueue_req & ~queue_full) ? 
                             {buf_tail_pol, buf_tail} + 1 : {buf_tail_pol, buf_tail};

@@ -11,8 +11,8 @@ module queue_out #(
   input [63:0] wdata_in,
   input        dequeue_req,
   output [63:0] rdata_out,
-  output [63:0] tail_data,
   output        rdata_filled,
+  output       queue_sat,
   output       queue_full,
   output       queue_empty);
 
@@ -56,9 +56,10 @@ module queue_out #(
 
   reg [$clog2(Q_SIZE)-1:0] buf_head, buf_tail;
   reg                     buf_head_pol, buf_tail_pol;
+  wire [$clog2(Q_SIZE)-1:0] bt, bh8;
+  wire                     bt_pol, bh8_pol;
 
-
-  wire [$clog2(Q_SIZE):0]  buf_head_next, buf_tail_next, bt;
+  wire [$clog2(Q_SIZE):0]  buf_head_next, buf_tail_next;
   wire                    head_double;
   wire                    tail_single;
   wire                    advance_head;
@@ -90,9 +91,12 @@ module queue_out #(
   wire wraparound = (buf_head_pol ^ buf_tail_pol);
   wire pt_eq = (buf_head === buf_tail);
 
-  // Sim hack
-  assign bt = buf_tail + 1;
-  wire pt_full = (bt[$clog2(Q_SIZE)-1:0] === buf_head);
+  // Sim hack to check buf_head === buf_tail + 1
+  assign {bt_pol, bt} = {buf_tail_pol, buf_tail} + 1;
+  wire pt_full = (bt === buf_head);
+
+  assign {bh8_pol, bh8} = {buf_head_pol, buf_head} + 8;
+  assign queue_sat = (bh8 <= buf_tail) ^ (bh8_pol ^ buf_tail_pol);
 
   assign queue_full = pt_full;
   assign queue_empty = ~buf_valid0[buf_head];
@@ -101,5 +105,7 @@ module queue_out #(
   assign rdata_filled = buf_valid01[buf_head];
 
   // Debugging
+  wire [63:0] tail_data;
   assign tail_data = {buf_addr1[buf_tail], buf_addr0[buf_tail]};
+
 endmodule 
