@@ -6,7 +6,6 @@ module test_outq;
   reg[63:0] wdata;
   reg de_req;
   wire[63:0] rdata;
-  wire[63:0] tdata;
   wire rfilled;
   wire full;
   wire empty;
@@ -18,7 +17,6 @@ module test_outq;
     .wdata_in(wdata),
     .dequeue_req(de_req),
     .rdata_out(rdata),
-    .tail_data(tdata),
     .rdata_filled(rfilled),
     .queue_full(full),
     .queue_empty(empty));
