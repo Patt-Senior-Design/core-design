@@ -36,10 +36,10 @@ module bfs_cache (
 
 
   wire ready;
-  assign ready = ~|counter[3:1];
+  assign ready = ~|counter;
 
   wire[30:0] acc_addr;
-  assign acc_addr = (addr_base >> 2) + (8 - counter)*2;
+  assign acc_addr = (addr_base >> 2) + (7 - counter)*2;
 
   // DEBUGGING
   wire [32:0] node = bfs_dc_addr >> 6;
@@ -49,52 +49,54 @@ module bfs_cache (
     else if (bfs_dc_req & (bfs_dc_op == LOAD_MARK)) deq_ct <= deq_ct + 1;
   end
 
-  reg req;
+  reg write_req;
+  reg read_req;
+  reg transferred;
   reg [1:0] op;
   reg [31:0] addr_base;
   reg [3:0] counter;
-  reg [63:0] rdata;
-  reg transfer;
+  wire [63:0] rdata;
 
   always @(negedge rst)
     $readmemh("graph.mem", storage);
 
   always @(posedge clk) begin
     if (rst) begin
-      req <= 0;
       counter <= 0;
     end else begin
-      req <= bfs_dc_req;
-
-      if (~ready | counter[0]) begin
+      if (~ready) begin
         counter <= counter - 1;
-        rdata <= {storage[acc_addr + 1], storage[acc_addr]}; // Get 8 bytes
-        casez(op)
-          LOAD_MARK: begin
-            if (counter[3]) // Mark on first iteration
-              storage[acc_addr + 1] <= storage[acc_addr + 1] | (1 << 31);
-          end
-          STORE_SPILL: begin
-            {storage[acc_addr + 1], storage[acc_addr]} <= bfs_dc_wdata;
-          end
-        endcase
+        read_req <= 1;
+        write_req <= ((op == STORE_SPILL) | ((op == LOAD_MARK) & counter[3]));
+      end else begin
+        read_req <= 0;
+        write_req <= 0;
       end
-
       if (bfs_dc_req) begin
         counter <= 8;
         addr_base <= bfs_dc_addr;
         op <= bfs_dc_op;
       end
-      
     end
-    transfer <= |counter;
+    transferred <= ~|counter;
   end
 
-  assign dc_rbuf_empty = ~req & ~transfer;
+  // Write logic
+  always @(posedge clk) begin
+    if (write_req) begin
+      casez(op)
+        LOAD_MARK: storage[acc_addr + 1] <= storage[acc_addr + 1] | (1 << 31); // Mark bit 63 on first iteration
+        STORE_SPILL: {storage[acc_addr + 1], storage[acc_addr]} <= bfs_dc_wdata; // Store 8 bytes
+      endcase
+    end
+  end
+
+  assign rdata = {storage[acc_addr + 1], storage[acc_addr]}; // Get 8 bytes
+
+  assign dc_rbuf_empty = transferred & ~counter[3];
   assign dc_ready = ready;
   assign dc_fs = &counter[2:0];
   assign dc_op = op;
-  assign dc_rdata = rdata;
-
+  assign dc_rdata = read_req ? rdata : dc_rdata;
 
 endmodule
