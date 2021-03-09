@@ -146,6 +146,7 @@ module bfs_queue #(
       INIT_RESTORE: begin
         next_ct = 6;
         inq_enq_req = {spill_fs, spill_fs};
+        inq_enq_data = dc_rdata;
         next_qstate = (spill_fs ? RESTORE : INIT_RESTORE);
       end
       RESTORE: begin
