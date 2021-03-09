@@ -1,4 +1,4 @@
-
+`define SW_QUEUE_BASE 32'h00010000  // Node 
 module bfs_core (
   input         clk,
   input         rst,
@@ -22,8 +22,11 @@ module bfs_core (
   
   // cache interface
   output        bfs_dc_req,
-  output [31:0] bfs_dc_addr,
+  output reg [1:0]  bfs_dc_op,
+  output reg [31:0] bfs_dc_addr,
+  output [63:0] bfs_dc_wdata,
   input         dc_ready,
+  input  [1:0]  dc_op,
   input         dc_rbuf_empty,
   input         dc_fs,
   input  [63:0] dc_rdata,
@@ -37,33 +40,51 @@ module bfs_core (
     NODE_HEADER = 2'b10,
     ADD_NEIGHS = 2'b11;
 
+  // Indication that bfs processing is active
+  wire active;
+  assign active = (state == NODE_HEADER | state == ADD_NEIGHS);
+
   // Queue interface
   wire q_rst;
   reg [1:0] enq_req;
   reg [63:0] enq_data;
   wire deq_req;
   wire [31:0] deq_data;
-  wire q_full, q_empty;
+  wire q_full, rq_empty;
+  wire pend_empty;
+  wire spill_req;
+  wire spill_op;
+  wire [63:0] spill_data;
 
-  assign q_rst = rst | done;
-  assign deq_req = (~q_empty & dc_ready);
+  assign q_rst = rst | rob_flush | done;
+  assign deq_req = (~rq_empty & dc_ready & ~spill_req);
 
-  bfs_queue q (
+  bfs_queue #(.MAINQ_SIZE(16), .BUFQ_SIZE(16)) q (
     .clk (clk),
     .bfs_rst (q_rst),
+    .active (active),
     .enqueue_req (enq_req),
     .wdata_in (enq_data),
     .dequeue_req (deq_req),
     .rdata_out (deq_data),
     .queue_full (q_full),
-    .queue_empty (q_empty));
+    .rqueue_empty (rq_empty),
+    .pend_empty (pend_empty),
+    .spill_req (spill_req),
+    .spill_op (spill_op),
+    .spill_data (spill_data),
+    .dc_fs (dc_fs),
+    .dc_op (dc_op),
+    .dc_ready (dc_ready),
+    .dc_rdata (dc_rdata),
+    .dc_rbuf_empty (dc_rbuf_empty));
 
   // Input Regs
   reg [5:0] rd;
   reg [6:0] robid;
-  // TODO: Eventually make these CSRs
-  reg[31:0] sw_queue_base;
-  // Inputs from custom instruction
+  // TODO: Eventually read them from CSRs
+  reg[31:0] swq_tail;
+  reg[31:0] swq_head;
   reg[31:0] from_node;
   reg[31:0] to_node;
 
@@ -74,14 +95,16 @@ module bfs_core (
       robid <= rename_robid;
       from_node <= rename_op1;
       to_node <= rename_op2;
+      swq_tail <= `SW_QUEUE_BASE;
+      swq_head <= `SW_QUEUE_BASE;
+    end 
+    if (spill_req) begin
+      if (spill_op)
+        swq_head <= swq_head + 64;
+      else
+        swq_tail <= swq_tail + 64;
     end
   end
-
-
-  // Cache
-  assign bfs_dc_req = deq_req;
-  assign bfs_dc_addr = deq_data;
-
 
   // State Machine: Queue insertion
   reg found;
@@ -93,25 +116,23 @@ module bfs_core (
   wire [3:0] rdata_neigh_ct = dc_rdata[32+:4];
 
   wire init_add_neighs; // If it has neighbors, unmarked, and frame start
-  assign init_add_neighs = (|rdata_neigh_ct & ~marked & dc_fs);
+  assign init_add_neighs = (|rdata_neigh_ct & ~marked & dc_fs & (dc_op == 2'b00));
   
   wire last_neigh_iter; // Either 1 or 2 neighs left
   assign last_neigh_iter = (~|neigh_ct[3:2] & ~(neigh_ct[1] & neigh_ct[0]));
 
-  //assign found = ~q_empty & (deq_data == to_node);
   wire done;
-  assign done = (q_empty & dc_rbuf_empty & (state == NODE_HEADER | state == ADD_NEIGHS));
+  assign done = (pend_empty & (swq_head === swq_tail));
 
   always @(posedge clk) begin
     if (rst | rob_flush) begin
       state <= IDLE;
       found <= 0;
-      sw_queue_base <= 32'hF0000000;
     end else begin
       // State latching
       state <= next_state;
       neigh_ct <= next_neigh_ct;
-      if (~q_empty & (deq_data == to_node))
+      if (~rq_empty & (deq_data == to_node))
         found <= 1;
       if (state == INIT)
         found <= 0;
@@ -149,6 +170,18 @@ module bfs_core (
     endcase
   end
 
+  // Cache
+  assign bfs_dc_req = deq_req | spill_req;
+  assign bfs_dc_wdata = spill_data;
+  // Address 
+  always @(*) begin
+    casez({spill_req, spill_op})
+      2'b0?: bfs_dc_addr = deq_data;
+      2'b10: bfs_dc_addr = swq_tail;
+      2'b11: bfs_dc_addr = swq_head;
+    endcase
+    bfs_dc_op = {spill_req & ~spill_op, spill_req};
+  end
 
   assign bfs_stall = (state !== IDLE);
   assign bfs_valid = done;
