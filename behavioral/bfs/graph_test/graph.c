@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <inttypes.h>
 
-#define G_SIZE 600
+#define G_SIZE 1023
 #define EDGE_CT 2*G_SIZE
 #define N_MAX 13
 
@@ -88,19 +88,18 @@ int is_neighbor(Node* from, Node* to) {
 
 typedef struct Queue_t {
   uint32_t head, tail;
-  uint32_t enq_ct;
+  uint32_t deq_ct;
   Node* val[N_MAX * G_SIZE];
 } Queue;
 
 void reset_queue(Queue* q) {
-  q->head = q->tail = q->enq_ct = 0;
+  q->head = q->tail =  q->deq_ct = 0;
 }
 
 void enqueue(Queue* q, Node* val) {
   q->val[q->tail++] = val;
   if (q->tail == G_SIZE)
     q->tail = 0;
-  q->enq_ct++;
 }
 
 int dequeue(Queue* q, Node** val) {
@@ -108,6 +107,7 @@ int dequeue(Queue* q, Node** val) {
   
   *val = q->val[q->head++];
   if (q->head == G_SIZE)  q->head = 0;
+  q->deq_ct++;
   return 1;
 }
 
@@ -154,7 +154,7 @@ uint32_t bfs_reachable(struct Graph* graph, Node* from, Node* to) {
     }
   }
 
-  printf("Enqueued Count: %u\n", bfs_q.enq_ct);
+  printf("Dequeued Count: %u\n", bfs_q.deq_ct);
   // Get the path
   if (found) {
     uint32_t path[G_SIZE];
@@ -235,6 +235,7 @@ int main (int argc, char *argv[]) {
   }
 
   bfs_reachable(&graph, from, to);
+  bfs_reachable(&graph, graph.nodes+4, graph.nodes+5);
 
   free_graph(&graph);
   return 0;
