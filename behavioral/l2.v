@@ -7,8 +7,8 @@ module l2(
 
   // request interface
   input         req_valid,
+  input [1:0]   req_op,
   input [31:2]  req_addr,
-  input         req_wen,
   input [3:0]   req_wmask,
   input [31:0]  req_wdata,
   output        l2_req_ready,
@@ -58,10 +58,10 @@ module l2(
   wire [31:3] l2tag_req_addr;
   wire [2:0]  l2tag_req_cmd;
   wire        l2tag_req_cmd_valid;
+  wire [1:0]  l2tag_req_op;
   wire        l2tag_req_valid;
   wire [3:0]  l2tag_req_way;
   wire [63:0] l2tag_req_wdata;
-  wire        l2tag_req_wen;
   wire [7:0]  l2tag_req_wmask;
   wire [31:6] l2tag_snoop_addr;
   wire [4:0]  l2tag_snoop_tag;
@@ -87,10 +87,10 @@ module l2(
     .l2tag_req_addr   (l2tag_req_addr[31:3]),
     .l2tag_req_cmd    (l2tag_req_cmd[2:0]),
     .l2tag_req_cmd_valid(l2tag_req_cmd_valid),
+    .l2tag_req_op     (l2tag_req_op[1:0]),
     .l2tag_req_valid  (l2tag_req_valid),
     .l2tag_req_way    (l2tag_req_way[3:0]),
     .l2tag_req_wdata  (l2tag_req_wdata[63:0]),
-    .l2tag_req_wen    (l2tag_req_wen),
     .l2tag_req_wmask  (l2tag_req_wmask[7:0]),
     .l2tag_snoop_addr (l2tag_snoop_addr[31:6]),
     .l2tag_snoop_tag  (l2tag_snoop_tag[4:0]),
@@ -114,9 +114,9 @@ module l2(
     .l2trans_tag      (l2trans_tag[2:0]),
     .l2trans_valid    (l2trans_valid),
     .req_addr         (req_addr),
+    .req_op           (req_op),
     .req_valid        (req_valid),
     .req_wdata        (req_wdata),
-    .req_wen          (req_wen),
     .req_wmask        (req_wmask),
     .rst              (rst));
 
@@ -144,10 +144,10 @@ module l2(
     .l2tag_req_addr (l2tag_req_addr[31:3]),
     .l2tag_req_cmd  (l2tag_req_cmd[2:0]),
     .l2tag_req_cmd_valid(l2tag_req_cmd_valid),
+    .l2tag_req_op   (l2tag_req_op[1:0]),
     .l2tag_req_valid(l2tag_req_valid),
     .l2tag_req_way  (l2tag_req_way[3:0]),
     .l2tag_req_wdata(l2tag_req_wdata[63:0]),
-    .l2tag_req_wen  (l2tag_req_wen),
     .l2tag_req_wmask(l2tag_req_wmask[7:0]),
     .l2tag_snoop_addr(l2tag_snoop_addr[31:6]),
     .l2tag_snoop_tag(l2tag_snoop_tag[4:0]),

@@ -5,11 +5,11 @@ module l2data(
 
   // l2tag interface
   input         l2tag_req_valid,
+  input [1:0]   l2tag_req_op,
   input         l2tag_req_cmd_valid,
   input [2:0]   l2tag_req_cmd,
   input [31:3]  l2tag_req_addr,
   input [3:0]   l2tag_req_way,
-  input         l2tag_req_wen,
   input [7:0]   l2tag_req_wmask,
   input [63:0]  l2tag_req_wdata,
   output        l2data_req_ready,
@@ -63,11 +63,11 @@ module l2data(
 
   // stage 0 latches
   reg         s0_req_valid_r;
+  reg [1:0]   s0_req_op_r;
   reg         s0_req_cmd_valid_r;
   reg [2:0]   s0_req_cmd_r;
   reg [31:3]  s0_req_addr_r;
   reg [3:0]   s0_req_way_r;
-  reg         s0_req_wen_r;
   reg [7:0]   s0_req_wmask_r;
   reg [63:0]  s0_req_wdata_r;
 
@@ -114,9 +114,13 @@ module l2data(
   wire [63:0] bank_rdata [0:3];
 
   // derived signals
+  wire s0_req_ren, s0_req_wen;
+  assign s0_req_ren = s0_req_op_r[0];
+  assign s0_req_wen = s0_req_op_r[1];
+
   wire req_burst;
   assign req_burst = s0_req_cmd_valid_r ? (s0_req_cmd_r == `CMD_FLUSH)
-                                        : ~s0_req_wen_r;
+                                        : s0_req_ren;
 
   wire [3:0] req_bank_sel, snoop_bank_sel;
   assign req_bank_sel = 4'b0001 << (req_burst ? s0_req_beat_r[1:0]
@@ -137,11 +141,13 @@ module l2data(
   assign s2_req_stall = l2_resp_valid & ~resp_ready;
 
   wire s0_req_issue, s0_snoop_issue;
-  assign s0_req_issue = s0_req_valid_r & (~s2_req_stall | s0_req_wen_r) &
+  assign s0_req_issue = s0_req_valid_r & (~s2_req_stall | s0_req_wen) &
                         (l2trans_l2data_req_ready | (s0_req_beat_r != 0)) &
                         ~s0_snoop_issue;
   assign s0_snoop_issue = s0_snoop_valid_r &
-                          (l2trans_l2data_snoop_ready | (s0_snoop_beat_r != 0));
+                          (s0_snoop_wen_r |
+                           l2trans_l2data_snoop_ready |
+                           (s0_snoop_beat_r != 0));
 
   wire s0_inv_hit, s1_inv_hit, s2_inv_hit;
   assign s0_inv_hit = s0_req_valid_r & s0_req_cmd_valid_r &
@@ -166,9 +172,10 @@ module l2data(
 
   // l2tag interface
   assign l2data_req_ready = ~s0_req_valid_r |
-                            ((~req_burst | (s0_req_beat_r == 7)) & s0_req_issue);
-  assign l2data_snoop_ready = ~s0_snoop_valid_r | ((s0_snoop_beat_r == 7) &
-                              (l2trans_l2data_snoop_ready | l2tag_snoop_wen));
+                            (s0_req_issue &
+                             (~req_burst |
+                              (~s0_req_wen & (s0_req_beat_r == 7))));
+  assign l2data_snoop_ready = ~s0_snoop_valid_r | (s0_snoop_beat_r == 7);
 
   assign l2data_flush_hit = s0_flush_hit | s1_flush_hit | s2_flush_hit;
 
@@ -199,7 +206,7 @@ module l2data(
     end else if(s0_req_issue) begin
       bank_in_valid = (~s0_req_cmd_valid_r | req_burst) ? req_bank_sel : 0;
       bank_addr = req_bank_addr;
-      bank_wen = s0_req_wen_r;
+      bank_wen = s0_req_wen & ~s0_req_ren;
       bank_wmask = s0_req_wmask_r;
       bank_wdata = s0_req_wdata_r;
     end else
@@ -226,16 +233,21 @@ module l2data(
     else if(l2data_req_ready) begin
       s0_req_valid_r <= l2tag_req_valid;
       if(l2tag_req_valid) begin
+        s0_req_op_r        <= l2tag_req_op;
         s0_req_cmd_valid_r <= l2tag_req_cmd_valid;
         s0_req_cmd_r       <= l2tag_req_cmd;
         s0_req_addr_r      <= l2tag_req_addr;
         s0_req_way_r       <= l2tag_req_way;
-        s0_req_wen_r       <= l2tag_req_wen;
         s0_req_wmask_r     <= l2tag_req_wmask;
         s0_req_wdata_r     <= l2tag_req_wdata;
       end
-    end else if(s0_upgr_hit)
-      s0_req_cmd_r <= `CMD_BUSRDX;
+    end else begin
+      if(s0_req_issue & (s0_req_beat_r == 7))
+        // (mark) burst read complete, deassert s0_req_ren and do word write
+        s0_req_op_r[0] <= 0;
+      if(s0_upgr_hit)
+        s0_req_cmd_r <= `CMD_BUSRDX;
+    end
 
   always @(posedge clk)
     if(rst)
@@ -269,8 +281,8 @@ module l2data(
     if(rst)
       s1_req_valid_r <= 0;
     else if(~s2_req_stall) begin
-      s1_req_valid_r <= s0_req_issue & ~s0_req_wen_r;
-      if(s0_req_issue & ~s0_req_wen_r) begin
+      s1_req_valid_r <= s0_req_issue & s0_req_ren;
+      if(s0_req_issue & s0_req_ren) begin
         s1_req_cmd_valid_r <= s0_req_cmd_valid_r;
         s1_req_cmd_r       <= s0_upgr_hit ? `CMD_BUSRDX : s0_req_cmd_r;
         s1_req_addr_r      <= s0_req_addr_r[31:6];

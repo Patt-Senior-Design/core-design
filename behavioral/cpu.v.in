@@ -101,8 +101,8 @@ module cpu(
 
   l2 l2(
     .req_valid(l2fifo_l2_req),
+    .req_op(l2fifo_l2_wen ? `OP_WR4 : `OP_RD),
     .req_addr(l2fifo_l2_addr),
-    .req_wen(l2fifo_l2_wen),
     .req_wmask(l2fifo_l2_wmask),
     .req_wdata(l2fifo_l2_wdata),
     .l2_req_ready(l2_l2fifo_ready),

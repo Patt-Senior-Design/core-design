@@ -12,6 +12,11 @@
 `define BUSID_BFS  2'b01
 `define BUSID_DRAM 2'b10
 
+// cache operations
+`define OP_RD   2'b01
+`define OP_WR4  2'b10
+`define OP_MARK 2'b11
+
 // cache state defines
 `define STATE_M  3'b101 // modified
 `define STATE_E  3'b001 // exclusive
