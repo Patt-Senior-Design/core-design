@@ -1,3 +1,5 @@
+`include "buscmd.vh"
+
 module cpu(
   input clk,
   input rst);
@@ -99,7 +101,7 @@ module cpu(
   l2fifo l2fifo(
     /*AUTOINST*/);
 
-  l2 l2(
+  l2 #(`BUSID_L2) l2(
     .req_valid(l2fifo_l2_req),
     .req_op(l2fifo_l2_wen ? `OP_WR4 : `OP_RD),
     .req_addr(l2fifo_l2_addr),

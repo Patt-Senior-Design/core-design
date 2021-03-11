@@ -1,5 +1,7 @@
 // l2 bus receiver
-module l2tag(
+module l2tag #(
+  parameter BUSID = `BUSID_L2
+  )(
   input            clk,
   input            rst,
 
@@ -153,7 +155,7 @@ module l2tag(
   wire       snoop_en, snoop_valid;
   assign snoop_en = bus_cycle_r == 0;
   assign snoop_valid = bus_valid &
-                       ((bus_tag[4:3] != `BUSID_L2) |
+                       ((bus_tag[4:3] != BUSID) |
                         (bus_cmd == `CMD_FILL) | (bus_cmd == `CMD_FLUSH));
 
   wire [2:0] tagmem_way_state;
@@ -209,7 +211,7 @@ module l2tag(
 
   wire fill;
   assign fill = pend_valid_r & pend_tag_valid_r & s1_snoop_valid_r &
-                (s1_snoop_tag_r == {`BUSID_L2,pend_tag_r});
+                (s1_snoop_tag_r == {BUSID,pend_tag_r});
 
   wire s0_req_stall, s1_req_stall;
   assign s0_req_stall = s0_req_valid_r & (s0_snoop_valid_r | s1_req_stall);
@@ -453,7 +455,7 @@ module l2tag(
         state_wway = tagmem_way_r;
         state_wdata = `STATE_I;
       end else if(pend_valid_r & pend_tag_valid_r &
-                  (s1_snoop_tag_r == {`BUSID_L2,pend_tag_r})) begin
+                  (s1_snoop_tag_r == {BUSID,pend_tag_r})) begin
         state_wen = 1;
         state_wway = s1_req_fill_way_r;
         state_wdata = s1_req_wen ? `STATE_M : `STATE_F;

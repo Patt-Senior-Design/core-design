@@ -1,5 +1,7 @@
 // l2 bus transmitter
-module l2trans(
+module l2trans #(
+  parameter BUSID = `BUSID_L2
+  )(
   input             clk,
   input             rst,
 
@@ -113,7 +115,7 @@ module l2trans(
       l2_bus_data = snoop_data[snoop_data_index_r];
     end else begin
       l2_bus_cmd = upgr_hit ? `CMD_BUSRDX : req_cmd_r;
-      l2_bus_tag = {`BUSID_L2,req_tag_r};
+      l2_bus_tag = {BUSID,req_tag_r};
       l2_bus_addr = req_addr_r;
       l2_bus_data = req_data[req_data_index_r];
     end

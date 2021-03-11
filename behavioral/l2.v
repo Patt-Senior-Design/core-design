@@ -1,7 +1,9 @@
 `include "buscmd.vh"
 
 // l2 cache
-module l2(
+module l2 #(
+  parameter BUSID = `BUSID_L2
+  )(
   input         clk,
   input         rst,
 
@@ -76,7 +78,7 @@ module l2(
   wire        l2trans_valid;
   // End of automatics
 
-  l2tag l2tag(
+  l2tag #(BUSID) l2tag(
     /*AUTOINST*/
     // Outputs
     .l2_bus_hit       (l2_bus_hit),
@@ -160,7 +162,7 @@ module l2(
     .resp_ready     (resp_ready),
     .rst            (rst));
 
-  l2trans l2trans(
+  l2trans #(BUSID) l2trans(
     /*AUTOINST*/
     // Outputs
     .l2_bus_addr          (l2_bus_addr),
