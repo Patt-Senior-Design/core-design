@@ -12,7 +12,7 @@ else
 $(error Unknown simulator $(SIM))
 endif
 
-SRCS := $(wildcard *.v)
+SRCS := $(wildcard *.v) bfs/bfs_core.v bfs/bfs_queue.v
 
 .PHONY: all clean
 

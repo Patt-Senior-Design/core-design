@@ -3,22 +3,21 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <inttypes.h>
+#include "csr.h"
 
 #define G_SIZE 256
 #define EDGE_CT 1024
-#define N_MAX 13
+#define N_MAX 14
 #define SEARCHES 32
 
 typedef struct Node_t {
   uint32_t marked;
   uint32_t neigh_ct;
-  struct Node_t* parent;
   struct Node_t* neighbors[N_MAX];
 } Node;
 
 struct Graph {
   uint32_t size;
-  uint32_t max_size;
   Node* nodes;
 };
 
@@ -42,10 +41,11 @@ uint32_t getNodeId(struct Graph* graph, Node* n) {
 
 void create_graph(struct Graph* graph, int size) {
   graph->size = size;
-  graph->max_size = 2 * size;
 
   // Alloc space for all nodes
-  Node* nodes = (Node*) malloc_chk(2 * size * sizeof(Node));
+  Node* nodes = (Node*) malloc_chk((size * sizeof(Node)) + 63);
+  // Align to 64-byte boundary
+  nodes = (Node*) ((((uintptr_t) nodes) + 63) & ~63);
   // Init node neighbors/sizes
   for (int i = 0; i < size; i++) {
     initNode(nodes + i);
@@ -118,16 +118,17 @@ int dequeue(Queue* q, Node** val) {
   return 1;
 }
 
+void unmark_graph(struct Graph* graph) {
+  for (int i = 0; i < graph->size; i++) {
+    Node* cur_node = graph->nodes + i;
+    cur_node->marked = 0;
+  }
+}
 
 void init_bfs(struct Graph* graph, Queue* q, Node* from) {
   create_queue(q);
   enqueue(q, from);
-  // Mark all nodes as unvisited
-  for (int i = 0; i < graph->size; i++) {
-    Node* cur_node = graph->nodes + i;
-    cur_node->marked = 0;
-    cur_node->parent = cur_node;
-  }
+  unmark_graph(graph);
   from->marked = 1;
 }
 
@@ -155,7 +156,6 @@ uint32_t bfs_reachable(struct Graph* graph, Node* from, Node* to) {
       // If not visited, add neighbors to queue
       if (!cur_neigh->marked) {
         enqueue(&bfs_q, cur_neigh);
-        cur_neigh->parent = cur_node;
       }
       // Mark node as visited
       cur_neigh->marked = 1;
@@ -164,18 +164,7 @@ uint32_t bfs_reachable(struct Graph* graph, Node* from, Node* to) {
 
   // Get the path
   if (found) {
-    uint32_t path[G_SIZE];
-    uint32_t ct = 0;
-    Node* n = to;
-    while (n != from) {
-      path[ct++] = getNodeId(graph, n);
-      n = n->parent;
-    }
-    printf("Solution Path: %u", getNodeId(graph, from));
-    for (int i = ct-1; i >= 0; i--) {
-      printf(" --> %u", path[i]);
-    }
-    puts("");
+    puts("Solution found");
     return 1;
   }
   else {
@@ -183,6 +172,33 @@ uint32_t bfs_reachable(struct Graph* graph, Node* from, Node* to) {
     return 0;
   }
 }
+
+bool bfs_wait_acc(void) {
+  for (int i = 0; i < 10000; i++) {
+    if (read_csr(CSR_MBFSSTAT) & MBFSSTAT_DONE) {return true;}
+  }
+  return false;
+}
+
+int32_t bfs_reachable_acc(struct Graph* graph, Node* from, Node* to) {
+  // Wait for any previous search to complete
+  if (!bfs_wait_acc()) {return -1;}
+
+  unmark_graph(graph);
+
+  // Set BFS parameters
+  write_csr(CSR_MBFSROOT, (uint32_t) from);
+  write_csr(CSR_MBFSTARG, (uint32_t) to);
+
+  // Start BFS
+  write_csr(CSR_MBFSSTAT, 1);
+
+  // Wait for search to complete
+  if (!bfs_wait_acc()) {return -1;}
+
+  return (read_csr(CSR_MBFSSTAT) & MBFSSTAT_FOUND) ? 1 : 0;
+}
+
 
 
 uint32_t getRandNodeId (void) {
@@ -195,7 +211,8 @@ int main (void) {
 
   puts("Creating nodes...");
   create_graph(&graph, G_SIZE);
-  
+  printf("Node base: %p\n", graph.nodes);
+
   /* Add edges: Prevent duplicates */
   puts("Adding edges...");
   uint32_t edge_ct = 0;
@@ -210,14 +227,24 @@ int main (void) {
       edge_ct++;
     }
   }
-  //print_graph(&graph);
+  print_graph(&graph);
 
   puts("Running BFS...");
   for (int i = 0; i < SEARCHES; i++) {
     Node* from = graph.nodes + getRandNodeId();
     Node* to = graph.nodes + getRandNodeId();
-    printf("%d: ", i);
-    bfs_reachable(&graph, from, to);
+    printf("%d to %d: ", getNodeId(&graph, from), getNodeId(&graph, to));
+
+    uint32_t found = bfs_reachable(&graph, from, to);
+    int32_t found_acc = bfs_reachable_acc(&graph, from, to);
+    if (found_acc < 0) {
+      puts("ERROR: accelerator timed out.");
+      return 1;
+    }
+    else if (found_acc != found) {
+      puts("ERROR: accelerator returned incorrect result.");
+      return 1;
+    }
   }
 
   free_graph(&graph);

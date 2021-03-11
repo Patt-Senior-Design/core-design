@@ -6,20 +6,11 @@ module cpu(
 
   /*AUTOWIRE*/
 
-  wire        bfs_bus_req;
   wire [2:0]  bfs_bus_cmd;
   wire [4:0]  bfs_bus_tag;
-  wire [31:2] bfs_bus_addr;
+  wire [31:6] bfs_bus_addr;
   wire [63:0] bfs_bus_data;
-  wire        bfs_bus_hit;
-  wire        bfs_bus_nack;
-  assign bfs_bus_req = 0;
-  assign bfs_bus_cmd = 0;
-  assign bfs_bus_tag = 0;
-  assign bfs_bus_addr = 0;
-  assign bfs_bus_data = 0;
-  assign bfs_bus_hit = 0;
-  assign bfs_bus_nack = 0;
+  wire [63:0] dc_rdata;
 
   brpred brpred(
     /*AUTOINST*/);
@@ -108,6 +99,34 @@ module cpu(
     .req_wmask(l2fifo_l2_wmask),
     .req_wdata(l2fifo_l2_wdata),
     .l2_req_ready(l2_l2fifo_ready),
+    /*AUTOINST*/);
+
+  bfs_core bfs(
+    /*AUTOINST*/);
+
+  l2 #(`BUSID_BFS) bfsl2(
+    .req_valid(bfs_dc_req),
+    .req_op(`OP_MARK),
+    .req_addr({bfs_dc_addr[31:6],4'd0}),
+    .req_wmask(4'b0001),
+    .req_wdata(32'h01),
+    .l2_req_ready(dc_ready),
+    .l2_resp_valid(dc_valid),
+    .l2_resp_error(),
+    .l2_resp_rdata(dc_rdata),
+    .resp_ready(1'b1),
+    .l2_inv_valid(),
+    .l2_inv_addr(),
+    .inv_ready(1'b1),
+    .l2_idle(dc_rbuf_empty),
+    .l2_bus_req(bfs_bus_req),
+    .l2_bus_cmd(bfs_bus_cmd),
+    .l2_bus_tag(bfs_bus_tag),
+    .l2_bus_addr(bfs_bus_addr),
+    .l2_bus_data(bfs_bus_data),
+    .l2_bus_hit(bfs_bus_hit),
+    .l2_bus_nack(bfs_bus_nack),
+    .bus_l2_grant(bus_bfs_grant),
     /*AUTOINST*/);
 
   dramctl dramctl(

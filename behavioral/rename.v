@@ -48,7 +48,7 @@ module rename(
   output reg [31:0] rename_imm, 
   input            exers_stall,
   input            lsq_stall,
-  input            csr_valid, // Prevent forwarding for 1 cycle
+  input            csr_stall,
 
   // wb interface
   output reg        rename_wb_valid,
@@ -78,10 +78,6 @@ module rename(
   reg [4:0] rs1;
   reg [4:0] rs2;
   reg [31:0] imm;
-
-  // csr stall logic
-  wire csr_valid_access;
-  assign csr_valid_access = valid & csr_access; 
 
   always @(posedge clk) begin
     if (!rename_stall) begin
@@ -115,7 +111,7 @@ module rename(
     // reservation stations seq
     rename_lsq_write = valid & uses_memory;
     rename_exers_write = valid & (~uses_memory) & (~csr_access); 
-    rename_csr_write = csr_valid_access & rob_rename_ishead & (~csr_valid);
+    rename_csr_write = valid & csr_access & rob_rename_ishead & ~rob_flush;
     rename_op = op;
     rename_robid = robid;
     rename_rd = rd | {forward,5'b0}; // inhibit uses_rd if forwarding
@@ -168,8 +164,9 @@ module rename(
     rename_imm = imm;
     
     // stall combinational
-    rename_stall = (rename_exers_write & exers_stall) | (rename_lsq_write & lsq_stall) | 
-                    (csr_valid_access & ~rob_rename_ishead) | rename_csr_write;
+    rename_stall = (rename_exers_write & exers_stall) |
+                   (rename_lsq_write & lsq_stall) |
+                   (valid & csr_access & (~rob_rename_ishead | csr_stall));
 
     rename_rs1 = rs1;
     rename_rs2 = rs2;
