@@ -2,26 +2,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
-
-#define CSR_MUARTSTAT "0xfc0"
-#define CSR_MUARTRX   "0xfc1"
-#define CSR_MUARTTX   "0x7c0"
-
-#define MUARTSTAT_RXEMPTY (0x00000001)
-#define MUARTSTAT_RXFULL  (0x00000002)
-#define MUARTSTAT_TXEMPTY (0x00000004)
-#define MUARTSTAT_TXFULL  (0x00000008)
+#include "csr.h"
 
 // 96MB (need room for stack)
 #define HEAP_MAX (96ul*1024*1024)
-
-#define read_csr(reg) ({ unsigned long __tmp;     \
-    asm volatile ("csrr %0, " reg : "=r"(__tmp)); \
-    __tmp; })
-
-#define write_csr(reg, val) ({ unsigned long __tmp;    \
-    __tmp = val;                                       \
-    asm volatile ("csrw " reg ", %0" : : "r"(__tmp)); })
 
 // The values of these symbols are obtained from the address (e.g. &_sdata, etc.)
 extern uint8_t _sdata;
