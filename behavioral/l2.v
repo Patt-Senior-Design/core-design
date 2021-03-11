@@ -25,6 +25,9 @@ module l2 #(
   output [31:6] l2_inv_addr,
   input         inv_ready,
 
+  // status signals
+  output        l2_idle,
+
   // bus interface
   output        l2_bus_req,
   output [2:0]  l2_bus_cmd,
@@ -45,6 +48,7 @@ module l2 #(
   /*AUTOWIRE*/
   // Beginning of automatic wires (for undeclared instantiated-module outputs)
   wire        l2data_flush_hit;
+  wire        l2data_idle;
   wire [31:6] l2data_req_addr;
   wire [2:0]  l2data_req_cmd;
   wire [63:0] l2data_req_data;
@@ -55,6 +59,7 @@ module l2 #(
   wire        l2data_snoop_ready;
   wire [4:0]  l2data_snoop_tag;
   wire        l2data_snoop_valid;
+  wire        l2tag_idle;
   wire [31:6] l2tag_inv_addr;
   wire        l2tag_inv_valid;
   wire [31:3] l2tag_req_addr;
@@ -72,11 +77,14 @@ module l2 #(
   wire [63:0] l2tag_snoop_wdata;
   wire        l2tag_snoop_wen;
   wire        l2trans_flush_hit;
+  wire        l2trans_idle;
   wire        l2trans_l2data_req_ready;
   wire        l2trans_l2data_snoop_ready;
   wire [2:0]  l2trans_tag;
   wire        l2trans_valid;
   // End of automatics
+
+  assign l2_idle = l2tag_idle & l2data_idle & l2trans_idle;
 
   l2tag #(BUSID) l2tag(
     /*AUTOINST*/
@@ -84,6 +92,7 @@ module l2 #(
     .l2_bus_hit       (l2_bus_hit),
     .l2_bus_nack      (l2_bus_nack),
     .l2_req_ready     (l2_req_ready),
+    .l2tag_idle       (l2tag_idle),
     .l2tag_inv_addr   (l2tag_inv_addr[31:6]),
     .l2tag_inv_valid  (l2tag_inv_valid),
     .l2tag_req_addr   (l2tag_req_addr[31:3]),
@@ -129,6 +138,7 @@ module l2 #(
     .l2_resp_rdata  (l2_resp_rdata),
     .l2_resp_valid  (l2_resp_valid),
     .l2data_flush_hit(l2data_flush_hit),
+    .l2data_idle    (l2data_idle),
     .l2data_req_addr(l2data_req_addr[31:6]),
     .l2data_req_cmd (l2data_req_cmd[2:0]),
     .l2data_req_data(l2data_req_data[63:0]),
@@ -171,6 +181,7 @@ module l2 #(
     .l2_bus_req           (l2_bus_req),
     .l2_bus_tag           (l2_bus_tag),
     .l2trans_flush_hit    (l2trans_flush_hit),
+    .l2trans_idle         (l2trans_idle),
     .l2trans_l2data_req_ready(l2trans_l2data_req_ready),
     .l2trans_l2data_snoop_ready(l2trans_l2data_snoop_ready),
     .l2trans_tag          (l2trans_tag[2:0]),

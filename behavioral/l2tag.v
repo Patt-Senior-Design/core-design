@@ -53,6 +53,8 @@ module l2tag #(
   output [31:6]    l2tag_inv_addr,
   input            invfifo_ready,
 
+  output           l2tag_idle,
+
   // bus interface (out)
   output           l2_bus_hit,
   output           l2_bus_nack);
@@ -286,6 +288,8 @@ module l2tag #(
                            ((s1_snoop_cmd_r == `CMD_BUSRDX) |
                             (s1_snoop_cmd_r == `CMD_BUSUPGR));
   assign l2tag_inv_addr = s1_snoop_addr_r;
+
+  assign l2tag_idle = ~s0_req_valid_r & ~s1_req_valid_r;
 
   // bus interface
   assign l2_bus_hit = bus_hit_r;

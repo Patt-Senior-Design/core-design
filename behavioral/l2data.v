@@ -43,7 +43,9 @@ module l2data(
   output        l2_resp_valid,
   output        l2_resp_error,
   output [63:0] l2_resp_rdata,
-  input         resp_ready);
+  input         resp_ready,
+
+  output        l2data_idle);
 
   // one-hot signal to index
   function automatic [8:0] addr2set(
@@ -194,6 +196,8 @@ module l2data(
   assign l2_resp_valid = s2_req_valid_r & ~s2_req_cmd_valid_r;
   assign l2_resp_error = 0;
   assign l2_resp_rdata = req_rdata;
+
+  assign l2data_idle = ~s0_req_valid_r & ~s1_req_valid_r & ~s2_req_valid_r;
 
   // bank signals
   always @(*)

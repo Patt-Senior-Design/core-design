@@ -26,6 +26,9 @@ module l2trans #(
   output            l2trans_valid,
   output [2:0]      l2trans_tag,
 
+  // l2 interface
+  output            l2trans_idle,
+
   // bus interface
   output            l2_bus_req,
   output reg [2:0]  l2_bus_cmd,
@@ -100,6 +103,9 @@ module l2trans #(
   assign l2trans_valid = req_valid_r & req_sent_r &
                          ~bus_nack & (bus_cycle_r == 7);;
   assign l2trans_tag = req_tag_r;
+
+  // l2 interface
+  assign l2trans_idle = ~req_valid_r;
 
   // bus interface
   assign l2_bus_req = (req_valid_r & ~req_sent_r &
