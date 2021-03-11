@@ -21,9 +21,8 @@ all: build/top
 build/top: $(SRCS) build/cpu.v $(DRAMSIM)/dramsim_vpi.cc $(DRAMSIM)/DRAMsim3/libdramsim3.a
 	$(SIM) $(SIMOPTS) -o build/top $^
 
-build/cpu.v: $(SRCS) cpu.v.in | build
-	@rm -f build/cpu.v
-	emacs -Q --batch --file=build/cpu.v --insert=../cpu.v.in --eval='(push ".." verilog-library-directories)' -f verilog-auto -f save-buffer
+build/%.v: $(SRCS) %.v.in | build
+	./auto.sh $*.v
 
 $(DRAMSIM)/DRAMsim3/libdramsim3.a:
 	$(MAKE) -C $(DRAMSIM)/DRAMsim3
