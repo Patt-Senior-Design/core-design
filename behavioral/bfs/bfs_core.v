@@ -45,7 +45,7 @@ module bfs_core (
 
   bfs_queue q (
     .clk (clk),
-    .bfs_rst (q_rst),
+    .bfs_rst (q_rst | rst),
     .enqueue_req (enq_req),
     .wdata_in (enq_data),
     .dequeue_req (deq_req),
@@ -60,7 +60,7 @@ module bfs_core (
   reg[31:0] sw_queue_size;
 
   // Cache
-  assign bfs_dc_req = deq_req;
+  assign bfs_dc_req = ~q_empty;
   assign bfs_dc_addr = deq_data;
 
   reg[2:0] dc_beat;
