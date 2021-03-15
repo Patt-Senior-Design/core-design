@@ -377,17 +377,20 @@ module dcache(
       s1_lsqid_r <= s0_lsqid_r;
       s1_raddr_r <= {s0_set,oh2idx(s0_taghits),s0_addr_r[5:3]};
       s1_op2_r <= s0_wdata_r[7:0];
-      if(s0_wen) begin
-        s1_wen_r <= 1;
-        s1_waddr_r <= {s0_set,oh2idx(s0_taghits),s0_addr_r[5:3]};
-        s1_wmask_r <= {4'b0,s0_wmask} << (s0_addr_r[2] * 4);
-        s1_wdata_r <= {4{s0_wdata_aligned}};
-      end else begin
-        s1_wen_r <= fill_wen;
-        s1_waddr_r <= fill_index;
-        s1_wmask_r <= ~mshr_wmask[rbuf_head[2:0]*8+:8];
-        s1_wdata_r <= fill_data;
-      end
+    end
+
+  // datamem write input latches
+  always @(posedge clk)
+    if(s0_wen & ~s0_stall) begin
+      s1_wen_r <= 1;
+      s1_waddr_r <= {s0_set,oh2idx(s0_taghits),s0_addr_r[5:3]};
+      s1_wmask_r <= {4'b0,s0_wmask} << (s0_addr_r[2] * 4);
+      s1_wdata_r <= {4{s0_wdata_aligned}};
+    end else begin
+      s1_wen_r <= fill_wen;
+      s1_waddr_r <= fill_index;
+      s1_wmask_r <= ~mshr_wmask[rbuf_head[2:0]*8+:8];
+      s1_wdata_r <= fill_data;
     end
 
   // fill_*
@@ -471,7 +474,7 @@ module dcache(
       // valid bits
       if(fill_done)
         tagmem_valid[addr2set({mshr_addr,4'b0})][oh2idx(mshr_way)] <= 1;
-      else if(~s0_wen & fill_wen)
+      else if((~s0_wen | s0_stall) & fill_wen)
         tagmem_valid[addr2set({mshr_addr,4'b0})][oh2idx(mshr_way)] <= 0;
 
       // lru bits
@@ -563,7 +566,7 @@ module dcache(
         rbuf_data[rbuf_tail[2:0]] <= l2_dc_rdata;
       end
 
-      if(~s0_wen & fill_wen) begin
+      if((~s0_wen | s0_stall) & fill_wen) begin
         rbuf_head <= rbuf_head + 1;
         rbuf_filled <= {rbuf_filled[6:0],1'b1};
       end
