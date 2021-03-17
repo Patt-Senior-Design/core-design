@@ -81,6 +81,7 @@ module l2 #(
   wire        l2trans_l2data_req_ready;
   wire        l2trans_l2data_snoop_ready;
   wire [2:0]  l2trans_tag;
+  wire        l2trans_upgr_hit;
   wire        l2trans_valid;
   // End of automatics
 
@@ -123,6 +124,7 @@ module l2 #(
     .l2data_snoop_ready(l2data_snoop_ready),
     .l2trans_flush_hit(l2trans_flush_hit),
     .l2trans_tag      (l2trans_tag[2:0]),
+    .l2trans_upgr_hit (l2trans_upgr_hit),
     .l2trans_valid    (l2trans_valid),
     .req_addr         (req_addr),
     .req_op           (req_op),
@@ -185,6 +187,7 @@ module l2 #(
     .l2trans_l2data_req_ready(l2trans_l2data_req_ready),
     .l2trans_l2data_snoop_ready(l2trans_l2data_snoop_ready),
     .l2trans_tag          (l2trans_tag[2:0]),
+    .l2trans_upgr_hit     (l2trans_upgr_hit),
     .l2trans_valid        (l2trans_valid),
     // Inputs
     .bus_l2_grant         (bus_l2_grant),

@@ -47,6 +47,7 @@ module l2tag #(
 
   input            l2trans_valid,
   input [2:0]      l2trans_tag,
+  input            l2trans_upgr_hit,
 
   // l2 interface
   output           l2tag_inv_valid,
@@ -426,7 +427,8 @@ module l2tag #(
     if(s0_snoop_valid_r | (s0_req_valid_r & ~s1_req_stall)) begin
       tmp_way = 0;
       for(i = 0; i < 4; i=i+1)
-        if(tagmem_tag[tmp_set][i*17+:17] == addr2tag(tmp_addr))
+        if((tagmem_tag[tmp_set][i*17+:17] == addr2tag(tmp_addr)) &&
+           (tagmem_state[tmp_set][i*3+:3] != `STATE_I))
           tmp_way = tmp_way | (1 << i);
 
       tagmem_way_r <= tmp_way;
@@ -448,6 +450,7 @@ module l2tag #(
     if(s1_snoop_valid_r) begin
       state_wset = addr2set(s1_snoop_addr_r);
       if(~tagmiss & (s1_snoop_cmd_r == `CMD_BUSRD)) begin
+        // goto shared state on BusRd from other caches
         state_wen = 1;
         state_wway = tagmem_way_r;
         state_wdata = `STATE_S;
@@ -455,17 +458,21 @@ module l2tag #(
                   (s1_snoop_cmd_r == `CMD_BUSRDX ||
                    s1_snoop_cmd_r == `CMD_BUSUPGR) &
                   invfifo_ready) begin
+        // invalidate on BusRdX from other caches
         state_wen = 1;
         state_wway = tagmem_way_r;
         state_wdata = `STATE_I;
       end else if(pend_valid_r & pend_tag_valid_r &
                   (s1_snoop_tag_r == {BUSID,pend_tag_r})) begin
+        // goto forward state on completed BusRd (TODO: exclusive state)
+        // goto modified state on completed BusRdX
         state_wen = 1;
         state_wway = s1_req_fill_way_r;
         state_wdata = s1_req_wen ? `STATE_M : `STATE_F;
       end
     end else if(s1_req_valid_r & s1_req_wen & ~s1_req_stall) begin
-      state_wset = addr2set(s1_req_addr_r);
+      // goto modified state from exclusive state
+      state_wset = addr2set(s1_req_addr_r[31:6]);
       if(s1_req_tag_stale_r) begin
         state_wen = s1_req_tagmem_state_r == `STATE_E;
         state_wway = s1_req_tagmem_way_r;
@@ -473,6 +480,12 @@ module l2tag #(
         state_wen = tagmem_way_state == `STATE_E;
         state_wway = tagmem_way_r;
       end
+      state_wdata = `STATE_M;
+    end else if(l2trans_valid & (pend_cmd_r == `CMD_BUSUPGR)) begin
+      // goto modified state on completed BusUpgr
+      state_wen = 1;
+      state_wset = addr2set(s1_req_addr_r[31:6]);
+      state_wway = s1_req_tagmem_way_r;
       state_wdata = `STATE_M;
     end
   end
@@ -504,6 +517,10 @@ module l2tag #(
         pend_cmd_r <= l2tag_req_cmd;
         pend_tag_valid_r <= 0;
       end
+
+      // did a BusUpgr get upgraded to a BusRdX?
+      if(l2trans_upgr_hit)
+        pend_cmd_r <= `CMD_BUSRDX;
 
       // l2trans lets us know when our scheduled command was sent
       if(l2trans_valid)
