@@ -18,7 +18,10 @@ typedef struct Node_t {
 
 struct Graph {
   uint32_t size;
+  // aligned to 64-byte boundary
   Node* nodes;
+  // original unaligned ptr, used during free
+  void* mem;
 };
 
 void* malloc_chk(size_t size) {
@@ -43,14 +46,13 @@ void create_graph(struct Graph* graph, int size) {
   graph->size = size;
 
   // Alloc space for all nodes
-  Node* nodes = (Node*) malloc_chk((size * sizeof(Node)) + 63);
+  graph->mem = malloc_chk((size * sizeof(Node)) + 63);
   // Align to 64-byte boundary
-  nodes = (Node*) ((((uintptr_t) nodes) + 63) & ~63);
+  graph->nodes = (Node*) ((((uintptr_t) graph->mem) + 63) & ~63);
   // Init node neighbors/sizes
   for (int i = 0; i < size; i++) {
-    initNode(nodes + i);
+    initNode(graph->nodes + i);
   }
-  graph->nodes = nodes;
 }
 
 
@@ -83,7 +85,7 @@ void print_graph(struct Graph* graph) {
 }
 
 void free_graph(struct Graph* graph) {
-  free(graph->nodes);
+  free(graph->mem);
 }
 
 
