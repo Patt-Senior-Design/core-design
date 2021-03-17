@@ -103,7 +103,9 @@ module bfs_core (
       // State latching
       state <= next_state;
       neigh_ct <= next_neigh_ct;
-      if (~q_empty & (deq_data == to_node))
+      if (start)
+        found <= 0;
+      else if (~q_empty & (deq_data == to_node))
         found <= 1;
     end
   end 
