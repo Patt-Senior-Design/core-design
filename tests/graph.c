@@ -137,6 +137,8 @@ void init_bfs(struct Graph* graph, Queue* q, Node* from) {
 
 /* BFS Graph Traversal */
 uint32_t bfs_reachable(struct Graph* graph, Node* from, Node* to) {
+  uint32_t time_begin = read_csr(CSR_MCYCLE);
+
   Queue bfs_q;
   init_bfs(graph, &bfs_q, from);
 
@@ -164,13 +166,13 @@ uint32_t bfs_reachable(struct Graph* graph, Node* from, Node* to) {
     }
   }
 
-  // Get the path
+  uint32_t time_diff = read_csr(CSR_MCYCLE) - time_begin;
   if (found) {
-    puts("Solution found");
+    printf("Path found in %ld cycles\n", time_diff);
     return 1;
   }
   else {
-    puts("No solution");
+    printf("No path found in %ld cycles\n", time_diff);
     return 0;
   }
 }
@@ -186,6 +188,7 @@ int32_t bfs_reachable_acc(struct Graph* graph, Node* from, Node* to) {
   // Wait for any previous search to complete
   if (!bfs_wait_acc()) {return -1;}
 
+  uint32_t time_begin = read_csr(CSR_MCYCLE);
   unmark_graph(graph);
 
   // Set BFS parameters
@@ -197,6 +200,9 @@ int32_t bfs_reachable_acc(struct Graph* graph, Node* from, Node* to) {
 
   // Wait for search to complete
   if (!bfs_wait_acc()) {return -1;}
+
+  uint32_t time_diff = read_csr(CSR_MCYCLE) - time_begin;
+  printf("Accelerator ran in %ld cycles\n", time_diff);
 
   return (read_csr(CSR_MBFSSTAT) & MBFSSTAT_FOUND) ? 1 : 0;
 }
