@@ -383,7 +383,7 @@ module dcache(
   always @(posedge clk)
     if(s0_wen & ~s0_stall) begin
       s1_wen_r <= 1;
-      s1_waddr_r <= {s0_set,oh2idx(s0_taghits),s0_addr_r[5:3]};
+      s1_waddr_r <= {s0_set,oh2idx(s0_mshrhit ? mshr_way : s0_taghits),s0_addr_r[5:3]};
       s1_wmask_r <= {4'b0,s0_wmask} << (s0_addr_r[2] * 4);
       s1_wdata_r <= {4{s0_wdata_aligned}};
     end else begin
