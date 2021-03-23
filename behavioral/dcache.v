@@ -359,7 +359,7 @@ module dcache(
 
   // s0_cycle_r
   always @(posedge clk)
-    if(rst)
+    if(rst | lsq_dc_flush)
       s0_cycle_r <= 0;
     else if(s0_burst_beat)
       s0_cycle_r <= s0_cycle_r + 1;
