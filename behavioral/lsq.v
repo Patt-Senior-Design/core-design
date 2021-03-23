@@ -299,7 +299,7 @@ module lsq(
         lq_rd[lq_insert_idx] <= rename_rd[4:0];
         lq_base[lq_insert_idx] <= rename_op1;
         lq_imm[lq_insert_idx] <= rename_imm;
-        lq_op2_rdy[lq_insert_idx] <= (~&rename_op[2:1]) | rename_op2ready;
+        lq_op2_rdy[lq_insert_idx] <= (~&rename_op[1:0]) | rename_op2ready;
         lq_op2[lq_insert_idx] <= rename_op2[7:0];
       end
 
