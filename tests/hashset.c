@@ -126,19 +126,19 @@ bool findNode (HashSet* set, int32_t val) {
       lbcmp_e |= (1 << 31);
   }
   uint32_t init_idx = hashIdx;
-  printf("idx: %8lx, lbcmp_empty: %8lx, lbcmp_val: %8lx, ", hashIdx, lbcmp_e, lbcmp_v);*/
+  printf("idx: %ld, ", init_idx);*/
   while (set->mdata[hashIdx] >> 7) {
     // Partial hashes match
     if ((set->mdata[hashIdx] & 0x7f) == ((hash >> PHASH_SHF) & 0x7f)) {
       // Actual values match
       if (set->arr[hashIdx] == val) {
-        //printf("diff: %ld\n", (hashIdx - init_idx) & (TABLE_SIZE-1));
+        //printf("final: %ld, ", hashIdx);
         return 1;
       }
     } 
     hashIdx = (hashIdx + 1) % set->capacity;
   }
-  //printf("diff: %ld\n", (hashIdx - init_idx) & (TABLE_SIZE-1));
+  //printf("final: %ld, ", hashIdx);
   return 0;
 }
 
@@ -199,31 +199,41 @@ void free_hashset (HashSet* set) {
 uint32_t find_in_set(HashSet* set, int32_t search_val, bool* found) {
   uint32_t exec_time = 0;
   // Measure time
-  asm("csrw mcycle, x0");
+  asm("csrrw x0, mcycle, x0");
   *found = findNode(set, search_val);
-  asm("csrr %0, mcycle" : "=r" (exec_time));
+  asm("csrrs %0, mcycle, x0" : "=r" (exec_time));
   return exec_time;
 }
 
 
 void measure_perf (HashSet* set, int32_t* elems, int32_t elem_ct, uint32_t samples) {
   uint64_t total_exec_time = 0;
+  uint32_t max_exec_time = 0;
+  uint32_t min_exec_time = 0xFFFFFFFF;
   uint32_t found_ct = 0;
   int32_t search_val = 0;
   bool found = 0;
-  
+  uint32_t exec_time = 0;
+
   for (int i = 0; i < samples; i++) {
-    if (i & 1)  search_val = search_val + 1;  // value+1: Most probably not found
+    if (i & 1)  search_val = (rand() % VAL_RANGE) + VAL_RANGE;  // value+1: Most probably not found
     else        search_val = elems[rand() % elem_ct];
 
-    uint32_t exec_time = find_in_set(set, search_val, &found);
+    asm volatile("csrrw x0, mcycle, x0");
+    found = findNode(set, search_val);
+    asm volatile("csrrs %0, mcycle, x0" : "=r" (exec_time));
+    //uint32_t exec_time = find_in_set(set, search_val, &found);
+
     total_exec_time += exec_time;
+    if (exec_time < min_exec_time) min_exec_time = exec_time;
+    if (exec_time > max_exec_time) max_exec_time = exec_time;
     found_ct += found;
   }
 
   // Average time for find stats
   uint32_t net_time = ((float)total_exec_time)/((float)samples); 
-  printf("{ Found: %ld / %ld,  Avg Exec Time: %ld }\n", found_ct, samples, net_time);
+  printf("{ Found: %ld / %ld,  Avg Exec Time: %ld, Min: %ld, Max: %ld }\n", 
+      found_ct, samples, net_time, min_exec_time, max_exec_time);
 }
 
 int main () {
@@ -232,7 +242,7 @@ int main () {
   HashSet* set = create_hashset(TABLE_SIZE);
   uint32_t MAX_ELEM_CT = 0;
   int lf_ct = 6;
-  float TARGET_LF[] = {0.6, 0.7, 0.8, 0.9, 0.95, 0.99};
+  float TARGET_LF[] = {0.5, 0.6, 0.7, 0.8, 0.9, 0.95};
   // Note: target_lf[0] has to be greater than largest increment
   int32_t* elems = (int32_t*) malloc ((uint32_t)(TABLE_SIZE * TARGET_LF[0] * sizeof(int32_t)));
 
