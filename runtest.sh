@@ -19,14 +19,14 @@ make -C $DIR/plugins || exit $?
 
 rm -f simtrace spiketrace
 
-TIMEOUT=120
+TIMEOUT=1200
 
 mkfifo simtrace
 timeout $TIMEOUT $DIR/behavioral/build/top +memfile=$HEXFILE +tracefile=simtrace +logfile=$LOGFILE &
 SIMPID=$!
 
 mkfifo spiketrace
-timeout $TIMEOUT $DIR/runspike.sh --log-commits $ELFFILE 2> spiketrace &
+timeout $TIMEOUT $DIR/runspike.sh --log-commits $ELFFILE 2> spiketrace 1> /dev/null &
 SPIKEPID=$!
 
 # ignore the lines from the spike boot rom
@@ -37,7 +37,7 @@ rm simtrace spiketrace
 
 wait $SIMPID
 if [ $? -eq 124 ]; then
-    echo "iverilog timed out" >> $DIFFFILE
+    echo "sim timed out" >> $DIFFFILE
     DIFFSTATUS=1
 fi
 
