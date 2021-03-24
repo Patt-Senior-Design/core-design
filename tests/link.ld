@@ -9,7 +9,7 @@ ENTRY(_start)
 
 MEMORY
 {
-  ROM (rx) : ORIGIN = 0x10000000, LENGTH = 256K
+  ROM (rx) : ORIGIN = 0x10000000, LENGTH = 16M
   RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 128M
 }
 
@@ -120,6 +120,8 @@ SECTIONS
   } > RAM
 
   _end = .;
+
+  __dso_handle = .;
 
   __global_pointer$ = MIN(__SDATA_BEGIN__ + 0x800,
                           MAX(__DATA_BEGIN__ + 0x800, __BSS_END__ - 0x800));

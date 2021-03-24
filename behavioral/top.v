@@ -27,7 +27,7 @@ module top();
   // memory map constants
   localparam
     ROM_BASE   = 32'h10000000/4,
-    ROM_SIZE   = (256*1024)/4,
+    ROM_SIZE   = (16*1024*1024)/4,
     RAM_BASE   = 32'h20000000/4,
     RAM_SIZE   = (128*1024*1024)/4,
     DBG_TOHOST = 32'h30000000/4,
