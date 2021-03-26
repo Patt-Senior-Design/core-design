@@ -303,14 +303,16 @@ module dcache(
     // if there are any invalid ways, use those instead of lru bits
     if(s0_invalid_way_avail)
        s0_mshr_alloc_way = s0_invalid_way_sel;
-    else
+    else begin
       // compute lru way
+      s0_mshr_alloc_way = 0;
       casez(s0_tagmem_lru)
         3'b0?0: s0_mshr_alloc_way[0] = 1;
         3'b0?1: s0_mshr_alloc_way[1] = 1;
         3'b10?: s0_mshr_alloc_way[2] = 1;
         3'b11?: s0_mshr_alloc_way[3] = 1;
       endcase
+    end
 
   // s0_stall
   always @(*) begin
