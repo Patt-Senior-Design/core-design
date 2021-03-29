@@ -9,8 +9,8 @@ module l2tag #(
   input            req_valid,
   input [1:0]      req_op,
   input [31:2]     req_addr,
-  input [3:0]      req_wmask,
-  input [31:0]     req_wdata,
+  input [7:0]      req_wmask,
+  input [63:0]     req_wdata,
   output           l2_req_ready,
 
   // bus interface (in)
@@ -25,12 +25,14 @@ module l2tag #(
   output           l2tag_req_valid,
   output [1:0]     l2tag_req_op,
   output           l2tag_req_cmd_valid,
+  output           l2tag_req_cmd_noinv,
   output reg [2:0] l2tag_req_cmd,
   output [31:3]    l2tag_req_addr,
   output [3:0]     l2tag_req_way,
   output [7:0]     l2tag_req_wmask,
   output [63:0]    l2tag_req_wdata,
   input            l2data_req_ready,
+  input            l2data_req_wdata_ready,
 
   output           l2tag_snoop_valid,
   output [4:0]     l2tag_snoop_tag,
@@ -101,11 +103,14 @@ module l2tag #(
   reg [67:0] tagmem_tag [0:511];
 
   // stage 0 latches
+  reg [2:0]  s0_req_beat_r;
+
   reg        s0_req_valid_r;
+  reg        s0_req_noop_r;
   reg [1:0]  s0_req_op_r;
   reg [31:2] s0_req_addr_r;
-  reg [3:0]  s0_req_wmask_r;
-  reg [31:0] s0_req_wdata_r;
+  reg [7:0]  s0_req_wmask_r;
+  reg [63:0] s0_req_wdata_r;
 
   reg        s0_snoop_valid_r;
   reg [2:0]  s0_snoop_cmd_r;
@@ -115,6 +120,7 @@ module l2tag #(
 
   // stage 1 latches
   reg        s1_req_valid_r;
+  reg        s1_req_noop_r;
   reg [1:0]  s1_req_op_r;
   reg [31:3] s1_req_addr_r;
   reg [7:0]  s1_req_wmask_r;
@@ -152,8 +158,9 @@ module l2tag #(
   reg [2:0]  bus_cycle_r;
 
   // derived signals
-  wire s1_req_wen;
-  assign s1_req_wen = s1_req_op_r[1];
+  wire s1_req_wen, s1_req_overwrite;
+  assign s1_req_wen = s1_req_op_r != `OP_RD;
+  assign s1_req_overwrite = s1_req_op_r == `OP_WR64;
 
   wire       snoop_en, snoop_valid;
   assign snoop_en = bus_cycle_r == 0;
@@ -217,16 +224,17 @@ module l2tag #(
                 (s1_snoop_tag_r == {BUSID,pend_tag_r});
 
   wire s0_req_stall, s1_req_stall;
-  assign s0_req_stall = s0_req_valid_r & (s0_snoop_valid_r | s1_req_stall);
+  assign s0_req_stall = s0_snoop_valid_r | s1_req_stall;
   assign s1_req_stall = s1_req_valid_r &
-                        ((~s1_req_tag_stale_r & (tagmiss | upgr_shared)) |
-                         s1_req_miss_r |
-                         ~l2data_req_ready);
+                        ((s1_req_noop_r
+                          ? ~l2data_req_wdata_ready : ~l2data_req_ready) |
+                         (~s1_req_tag_stale_r & (tagmiss | upgr_shared)) |
+                         s1_req_miss_r);
 
   wire       lru_wen;
   wire [8:0] lru_wset;
   wire [2:0] lru_wdata;
-  assign lru_wen = s1_req_valid_r & ~s1_req_stall;
+  assign lru_wen = s1_req_valid_r & ~s1_req_noop_r & ~s1_req_stall;
   assign lru_wset = addr2set(s1_req_addr_r);
   assign lru_wdata = s1_req_tag_stale_r
                      ? next_lru(s1_req_tagmem_way_r, s1_req_tagmem_lru_r)
@@ -249,14 +257,23 @@ module l2tag #(
                            (s1_snoop_cmd_r == `CMD_BUSUPGR)) &
                           (l2data_flush_hit | l2trans_flush_hit);
 
+  wire s0_req_noop, s0_req_noop_beat;
+  assign s0_req_noop = (s0_req_valid_r & (s0_req_op_r == `OP_WR64)) |
+                       ((s0_req_beat_r != 0) & (s0_req_beat_r != 7));
+  assign s0_req_noop_beat = ~s0_req_stall &
+                            ((s0_req_valid_r & (s0_req_op_r == `OP_WR64)) |
+                             (s0_req_beat_r != 0));
+
   // l2reqfifo interface
   assign l2_req_ready = ~s0_req_stall;
+  assign l2_req_wdata_ready = l2_req_ready;
 
   // l2data interface
   assign l2tag_req_valid = (s1_req_valid_r & ~s1_req_stall) |
                            (s1_req_miss_r & ~pend_valid_r);
   assign l2tag_req_op = s1_req_miss_r ? `OP_RD : s1_req_op_r;
   assign l2tag_req_cmd_valid = s1_req_miss_r;
+  assign l2tag_req_cmd_noinv = s1_req_overwrite;
   assign l2tag_req_addr = s1_req_evict_r
                           ? {fill_tag,addr2set(s1_req_addr_r),3'b0}
                           : s1_req_addr_r;
@@ -321,9 +338,16 @@ module l2tag #(
 
   always @(posedge clk)
     if(rst)
+      s0_req_beat_r <= 0;
+    else if(s0_req_noop_beat)
+      s0_req_beat_r <= s0_req_beat_r + 1;
+
+  always @(posedge clk)
+    if(rst)
       s0_req_valid_r <= 0;
     else if(~s0_req_stall) begin
       s0_req_valid_r <= req_valid;
+      s0_req_noop_r <= s0_req_noop;
       s0_req_op_r <= req_op;
       s0_req_addr_r <= req_addr;
       s0_req_wmask_r <= req_wmask;
@@ -351,15 +375,16 @@ module l2tag #(
     else if(~s1_req_stall) begin
       s1_req_valid_r <= s0_req_valid_r & ~s0_snoop_valid_r;
       if(s0_req_valid_r & ~s0_snoop_valid_r) begin
+        s1_req_noop_r <= s0_req_noop_r;
         s1_req_op_r <= s0_req_op_r;
         s1_req_addr_r <= s0_req_addr_r[31:3];
-        s1_req_wmask_r <= s0_req_wmask_r << (s0_req_addr_r[2] * 4);
+        s1_req_wmask_r <= s0_req_wmask_r;
         s1_req_wdata_r <= {2{s0_req_wdata_r}};
       end
     end
 
   always @(posedge clk)
-    if(s1_req_valid_r & ~s1_req_tag_stale_r) begin
+    if(s1_req_valid_r & ~s1_req_noop_r & ~s1_req_tag_stale_r) begin
       s1_req_tagmem_way_r <= tagmem_way_r;
       s1_req_tagmem_state_r <= tagmem_way_state;
       s1_req_tagmem_lru_r <= tagmem_lru_r;
@@ -375,7 +400,8 @@ module l2tag #(
       s1_req_miss_r <= 0;
 
     // we have a fresh request, check for a miss and latch params
-    if(s1_req_valid_r & ~s1_req_miss_r & ~s1_req_tag_stale_r) begin
+    if(s1_req_valid_r & ~s1_req_noop_r &
+       ~s1_req_miss_r & ~s1_req_tag_stale_r) begin
       s1_req_miss_r <= tagmiss | upgr_shared;
       s1_req_upgr_r <= ~tagmiss & upgr_shared;
       s1_req_evict_r <= evict;
@@ -424,7 +450,7 @@ module l2tag #(
   always @(posedge clk) begin
     tmp_addr = s0_snoop_valid_r ? s0_snoop_addr_r : s0_req_addr_r[31:6];
     tmp_set = addr2set(tmp_addr);
-    if(s0_snoop_valid_r | (s0_req_valid_r & ~s1_req_stall)) begin
+    if(s0_snoop_valid_r | (s0_req_valid_r & ~s0_req_noop_r & ~s1_req_stall)) begin
       tmp_way = 0;
       for(i = 0; i < 4; i=i+1)
         if((tagmem_tag[tmp_set][i*17+:17] == addr2tag(tmp_addr)) &&
@@ -470,7 +496,7 @@ module l2tag #(
         state_wway = s1_req_fill_way_r;
         state_wdata = s1_req_wen ? `STATE_M : `STATE_F;
       end
-    end else if(s1_req_valid_r & s1_req_wen & ~s1_req_stall) begin
+    end else if(s1_req_valid_r & ~s1_req_noop_r & s1_req_wen & ~s1_req_stall) begin
       // goto modified state from exclusive state
       state_wset = addr2set(s1_req_addr_r[31:6]);
       if(s1_req_tag_stale_r) begin

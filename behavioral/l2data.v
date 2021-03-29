@@ -7,12 +7,14 @@ module l2data(
   input         l2tag_req_valid,
   input [1:0]   l2tag_req_op,
   input         l2tag_req_cmd_valid,
+  input         l2tag_req_cmd_noinv,
   input [2:0]   l2tag_req_cmd,
   input [31:3]  l2tag_req_addr,
   input [3:0]   l2tag_req_way,
   input [7:0]   l2tag_req_wmask,
   input [63:0]  l2tag_req_wdata,
   output        l2data_req_ready,
+  output        l2data_req_wdata_ready,
 
   input         l2tag_snoop_valid,
   input [4:0]   l2tag_snoop_tag,
@@ -28,6 +30,7 @@ module l2data(
 
   // l2trans interface
   output        l2data_req_valid,
+  output        l2data_req_noinv,
   output [2:0]  l2data_req_cmd,
   output [31:6] l2data_req_addr,
   output [63:0] l2data_req_data,
@@ -67,6 +70,7 @@ module l2data(
   reg         s0_req_valid_r;
   reg [1:0]   s0_req_op_r;
   reg         s0_req_cmd_valid_r;
+  reg         s0_req_cmd_noinv_r;
   reg [2:0]   s0_req_cmd_r;
   reg [31:3]  s0_req_addr_r;
   reg [3:0]   s0_req_way_r;
@@ -87,6 +91,7 @@ module l2data(
   // stage 1 latches
   reg         s1_req_valid_r;
   reg         s1_req_cmd_valid_r;
+  reg         s1_req_cmd_noinv_r;
   reg [2:0]   s1_req_cmd_r;
   reg [31:6]  s1_req_addr_r;
   reg [3:0]   s1_req_bank_r;
@@ -99,6 +104,7 @@ module l2data(
   // stage 2 latches
   reg         s2_req_valid_r;
   reg         s2_req_cmd_valid_r;
+  reg         s2_req_cmd_noinv_r;
   reg [2:0]   s2_req_cmd_r;
   reg [31:6]  s2_req_addr_r;
   reg [3:0]   s2_req_bank_r;
@@ -116,13 +122,14 @@ module l2data(
   wire [63:0] bank_rdata [0:3];
 
   // derived signals
-  wire s0_req_ren, s0_req_wen;
+  wire s0_req_ren, s0_req_wen, s0_req_overwrite;
   assign s0_req_ren = s0_req_op_r[0];
-  assign s0_req_wen = s0_req_op_r[1];
+  assign s0_req_wen = s0_req_op_r != `OP_RD;
+  assign s0_req_overwrite = s0_req_op_r == `OP_WR64;
 
   wire req_burst;
   assign req_burst = s0_req_cmd_valid_r ? (s0_req_cmd_r == `CMD_FLUSH)
-                                        : s0_req_ren;
+                                        : (s0_req_ren | s0_req_overwrite);
 
   wire [3:0] req_bank_sel, snoop_bank_sel;
   assign req_bank_sel = 4'b0001 << (req_burst ? s0_req_beat_r[1:0]
@@ -166,23 +173,26 @@ module l2data(
 
   wire s0_upgr_hit, s1_upgr_hit, s2_upgr_hit;
   assign s0_upgr_hit = l2tag_inv_valid & s0_inv_hit &
-                       (s0_req_cmd_r == `CMD_BUSUPGR);
+                       (s0_req_cmd_r == `CMD_BUSUPGR) & ~s0_req_cmd_noinv_r;
   assign s1_upgr_hit = l2tag_inv_valid & s1_inv_hit &
-                       (s1_req_cmd_r == `CMD_BUSUPGR);
+                       (s1_req_cmd_r == `CMD_BUSUPGR) & ~s1_req_cmd_noinv_r;
   assign s2_upgr_hit = l2tag_inv_valid & s2_inv_hit &
-                       (s2_req_cmd_r == `CMD_BUSUPGR);
+                       (s2_req_cmd_r == `CMD_BUSUPGR) & ~s2_req_cmd_noinv_r;
 
   // l2tag interface
   assign l2data_req_ready = ~s0_req_valid_r |
                             (s0_req_issue &
                              (~req_burst |
-                              (~s0_req_wen & (s0_req_beat_r == 7))));
+                              (~(s0_req_ren & s0_req_wen) &
+                               (s0_req_beat_r == 7))));
+  assign l2data_req_wdata_ready = ~s0_req_valid_r | s0_req_issue;
   assign l2data_snoop_ready = ~s0_snoop_valid_r | (s0_snoop_beat_r == 7);
 
   assign l2data_flush_hit = s0_flush_hit | s1_flush_hit | s2_flush_hit;
 
   // l2trans interface
   assign l2data_req_valid = s2_req_valid_r & s2_req_cmd_valid_r;
+  assign l2data_req_noinv = s1_req_cmd_noinv_r;
   assign l2data_req_cmd = s2_upgr_hit ? `CMD_BUSRDX : s2_req_cmd_r;
   assign l2data_req_addr = s2_req_addr_r;
   assign l2data_req_data = req_rdata;
@@ -211,7 +221,7 @@ module l2data(
       bank_in_valid = (~s0_req_cmd_valid_r | req_burst) ? req_bank_sel : 0;
       bank_addr = req_bank_addr;
       bank_wen = s0_req_wen & ~s0_req_ren;
-      bank_wmask = s0_req_wmask_r;
+      bank_wmask = s0_req_overwrite ? 8'b11111111 : s0_req_wmask_r;
       bank_wdata = s0_req_wdata_r;
     end else
       bank_in_valid = 0;
@@ -239,11 +249,10 @@ module l2data(
       if(l2tag_req_valid) begin
         s0_req_op_r        <= l2tag_req_op;
         s0_req_cmd_valid_r <= l2tag_req_cmd_valid;
+        s0_req_cmd_noinv_r <= l2tag_req_cmd_noinv;
         s0_req_cmd_r       <= l2tag_req_cmd;
         s0_req_addr_r      <= l2tag_req_addr;
         s0_req_way_r       <= l2tag_req_way;
-        s0_req_wmask_r     <= l2tag_req_wmask;
-        s0_req_wdata_r     <= l2tag_req_wdata;
       end
     end else begin
       if(s0_req_issue & (s0_req_beat_r == 7))
@@ -251,6 +260,12 @@ module l2data(
         s0_req_op_r[0] <= 0;
       if(s0_upgr_hit)
         s0_req_cmd_r <= `CMD_BUSRDX;
+    end
+
+  always @(posedge clk)
+    if(l2data_req_wdata_ready) begin
+      s0_req_wmask_r <= l2tag_req_wmask;
+      s0_req_wdata_r <= l2tag_req_wdata;
     end
 
   always @(posedge clk)
@@ -288,6 +303,7 @@ module l2data(
       s1_req_valid_r <= s0_req_issue & s0_req_ren;
       if(s0_req_issue & s0_req_ren) begin
         s1_req_cmd_valid_r <= s0_req_cmd_valid_r;
+        s1_req_cmd_noinv_r <= s0_req_cmd_noinv_r;
         s1_req_cmd_r       <= s0_upgr_hit ? `CMD_BUSRDX : s0_req_cmd_r;
         s1_req_addr_r      <= s0_req_addr_r[31:6];
         s1_req_bank_r      <= req_bank_sel;
@@ -314,6 +330,7 @@ module l2data(
       s2_req_valid_r <= s1_req_valid_r;
       if(s1_req_valid_r) begin
         s2_req_cmd_valid_r <= s1_req_cmd_valid_r;
+        s2_req_cmd_noinv_r <= s1_req_cmd_noinv_r;
         s2_req_cmd_r       <= s1_upgr_hit ? `CMD_BUSRDX : s1_req_cmd_r;
         s2_req_addr_r      <= s1_req_addr_r;
         s2_req_bank_r      <= s1_req_bank_r;

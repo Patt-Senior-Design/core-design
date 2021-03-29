@@ -96,8 +96,8 @@ module cpu(
     .req_valid(l2fifo_l2_req),
     .req_op(l2fifo_l2_wen ? `OP_WR4 : `OP_RD),
     .req_addr(l2fifo_l2_addr),
-    .req_wmask(l2fifo_l2_wmask),
-    .req_wdata(l2fifo_l2_wdata),
+    .req_wmask(l2fifo_l2_addr[2] ? {l2fifo_l2_wmask,4'b0} : {4'b0,l2fifo_l2_wmask}),
+    .req_wdata({2{l2fifo_l2_wdata}}),
     .l2_req_ready(l2_l2fifo_ready),
     /*AUTOINST*/);
 
@@ -108,8 +108,8 @@ module cpu(
     .req_valid(bfs_dc_req),
     .req_op(`OP_MARK),
     .req_addr({bfs_dc_addr[31:6],4'd0}),
-    .req_wmask(4'b0001),
-    .req_wdata(32'h01),
+    .req_wmask(8'b0001),
+    .req_wdata(64'h01),
     .l2_req_ready(dc_ready),
     .l2_resp_valid(dc_valid),
     .l2_resp_error(),

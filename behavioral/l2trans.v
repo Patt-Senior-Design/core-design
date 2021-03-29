@@ -7,6 +7,7 @@ module l2trans #(
 
   // l2data interface
   input             l2data_req_valid,
+  input             l2data_req_noinv,
   input [2:0]       l2data_req_cmd,
   input [31:6]      l2data_req_addr,
   input [63:0]      l2data_req_data,
@@ -46,6 +47,7 @@ module l2trans #(
   // due to tag size, we support a max of 8 pending commands
 
   reg           req_valid_r;
+  reg           req_noinv_r;
   reg           req_sent_r;
   reg [2:0]     req_cmd_r;
   reg [31:6]    req_addr_r;
@@ -89,7 +91,8 @@ module l2trans #(
   assign flush_hit = inv_hit & (req_cmd_r == `CMD_FLUSH);
 
   wire upgr_hit;
-  assign upgr_hit = l2tag_inv_valid & inv_hit & (req_cmd_r == `CMD_BUSUPGR);
+  assign upgr_hit = l2tag_inv_valid & inv_hit &
+                    (req_cmd_r == `CMD_BUSUPGR) & ~req_noinv_r;
 
   // l2data interface
   assign l2trans_l2data_req_ready = ~req_valid_r |
@@ -140,6 +143,7 @@ module l2trans #(
       req_valid_r <= 0;
     else if(l2trans_l2data_req_ready) begin
       req_valid_r <= l2data_req_valid;
+      req_noinv_r <= l2data_req_noinv;
       req_sent_r <= 0;
       if(l2data_req_valid) begin
         req_cmd_r <= l2data_req_cmd;

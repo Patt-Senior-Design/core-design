@@ -15,6 +15,7 @@
 // cache operations
 `define OP_RD   2'b01
 `define OP_WR4  2'b10
+`define OP_WR64 2'b00
 `define OP_MARK 2'b11
 
 // cache state defines
