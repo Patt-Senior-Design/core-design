@@ -99,6 +99,7 @@ module cpu(
     .req_wmask(l2fifo_l2_addr[2] ? {l2fifo_l2_wmask,4'b0} : {4'b0,l2fifo_l2_wmask}),
     .req_wdata({2{l2fifo_l2_wdata}}),
     .l2_req_ready(l2_l2fifo_ready),
+    .l2_resp_op(),
     /*AUTOINST*/);
 
   bfs_core bfs(
@@ -113,6 +114,7 @@ module cpu(
     .l2_req_ready(dc_ready),
     .l2_resp_valid(dc_valid),
     .l2_resp_error(),
+    .l2_resp_op(),
     .l2_resp_rdata(dc_rdata),
     .resp_ready(1'b1),
     .l2_inv_valid(),

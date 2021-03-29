@@ -18,6 +18,7 @@ module l2 #(
   // response interface
   output        l2_resp_valid,
   output        l2_resp_error,
+  output [1:0]  l2_resp_op,
   output [63:0] l2_resp_rdata,
   input         resp_ready,
 
@@ -142,6 +143,7 @@ module l2 #(
     /*AUTOINST*/
     // Outputs
     .l2_resp_error(l2_resp_error),
+    .l2_resp_op(l2_resp_op),
     .l2_resp_rdata(l2_resp_rdata),
     .l2_resp_valid(l2_resp_valid),
     .l2data_flush_hit(l2data_flush_hit),

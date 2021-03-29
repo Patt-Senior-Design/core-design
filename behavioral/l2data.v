@@ -45,6 +45,7 @@ module l2data(
   // l2 interface
   output        l2_resp_valid,
   output        l2_resp_error,
+  output [1:0]  l2_resp_op,
   output [63:0] l2_resp_rdata,
   input         resp_ready,
 
@@ -90,6 +91,7 @@ module l2data(
 
   // stage 1 latches
   reg         s1_req_valid_r;
+  reg [1:0]   s1_req_op_r;
   reg         s1_req_cmd_valid_r;
   reg         s1_req_cmd_noinv_r;
   reg [2:0]   s1_req_cmd_r;
@@ -103,6 +105,7 @@ module l2data(
 
   // stage 2 latches
   reg         s2_req_valid_r;
+  reg [1:0]   s2_req_op_r;
   reg         s2_req_cmd_valid_r;
   reg         s2_req_cmd_noinv_r;
   reg [2:0]   s2_req_cmd_r;
@@ -205,6 +208,7 @@ module l2data(
   // l2 interface
   assign l2_resp_valid = s2_req_valid_r & ~s2_req_cmd_valid_r;
   assign l2_resp_error = 0;
+  assign l2_resp_op = s1_req_op_r;
   assign l2_resp_rdata = req_rdata;
 
   assign l2data_idle = ~s0_req_valid_r & ~s1_req_valid_r & ~s2_req_valid_r;
@@ -302,6 +306,7 @@ module l2data(
     else if(~s2_req_stall) begin
       s1_req_valid_r <= s0_req_issue & s0_req_ren;
       if(s0_req_issue & s0_req_ren) begin
+        s1_req_op_r        <= s0_req_op_r;
         s1_req_cmd_valid_r <= s0_req_cmd_valid_r;
         s1_req_cmd_noinv_r <= s0_req_cmd_noinv_r;
         s1_req_cmd_r       <= s0_upgr_hit ? `CMD_BUSRDX : s0_req_cmd_r;
@@ -329,6 +334,7 @@ module l2data(
     else if(~s2_req_stall) begin
       s2_req_valid_r <= s1_req_valid_r;
       if(s1_req_valid_r) begin
+        s2_req_op_r        <= s1_req_op_r;
         s2_req_cmd_valid_r <= s1_req_cmd_valid_r;
         s2_req_cmd_noinv_r <= s1_req_cmd_noinv_r;
         s2_req_cmd_r       <= s1_upgr_hit ? `CMD_BUSRDX : s1_req_cmd_r;
