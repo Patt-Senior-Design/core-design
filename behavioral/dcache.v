@@ -370,7 +370,7 @@ module dcache(
   always @(posedge clk)
     if(rst | lsq_dc_flush) begin
       s1_req_r <= 0;
-      s1_wen_r <= 0;
+      s1_forward_r <= 0;
     end else if(~s1_stall) begin
       s1_req_r <= s0_req_r & ~s0_op_r[0] & ~s0_mshrhit & ~s0_tagmiss;
       s1_forward_r <= s0_req_r & s0_rd_forward;
