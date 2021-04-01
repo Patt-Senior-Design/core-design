@@ -3,20 +3,26 @@ module test_bfs;
   reg rst;
 
   wire bfs_dc_req;
+  wire[1:0] bfs_dc_op;
   wire[31:0] bfs_dc_addr;
   wire dc_ready;
   wire dc_rbuf_empty;
   wire dc_fs;
+  wire [1:0] dc_op;
+  wire[63:0] bfs_dc_wdata;
   wire[63:0] dc_rdata;
 
   bfs_cache cache (
     .clk (clk),
     .rst (rst),
     .bfs_dc_req (bfs_dc_req),
+    .bfs_dc_op (bfs_dc_op),
     .bfs_dc_addr (bfs_dc_addr),
     .dc_ready (dc_ready),
     .dc_rbuf_empty (dc_rbuf_empty),
+    .bfs_dc_wdata (bfs_dc_wdata),
     .dc_fs (dc_fs),
+    .dc_op (dc_op),
     .dc_rdata (dc_rdata));
 
   // Rename
@@ -56,8 +62,11 @@ module test_bfs;
     .wb_bfs_stall (wb_bfs_stall),
 
     .bfs_dc_req (bfs_dc_req),
+    .bfs_dc_op (bfs_dc_op),
     .bfs_dc_addr (bfs_dc_addr),
+    .bfs_dc_wdata (bfs_dc_wdata),
     .dc_ready (dc_ready),
+    .dc_op (dc_op),
     .dc_rbuf_empty (dc_rbuf_empty),
     .dc_fs (dc_fs),
     .dc_rdata (dc_rdata),
@@ -80,6 +89,7 @@ module test_bfs;
     end
 
     clk = 0;
+    rob_flush = 0;
     rst = 1;
     #30;
 
@@ -92,11 +102,19 @@ module test_bfs;
     bfs_write = 0; // Not run
     bfs_rd = 7;
     bfs_robid = 3;
-    from_node = 32'h0100;
-    to_node = 32'h0180;
+    from_node = 32'h0100; // Node 4
+    to_node = 32'h0140; // Node 5
     @(posedge wb_valid);
-    #100;
+    #60000;
 
+    rst = 1;
+    #10;
+    rst = 0;
+    bfs_write = 1;
+    #10;
+    bfs_write = 0;
+    @(posedge wb_valid);
+    #20000;
     $finish;
   end
 

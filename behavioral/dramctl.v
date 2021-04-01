@@ -54,8 +54,8 @@ module dramctl(
   // cycle 0 of rdata is handled below
   reg [64*8-1:0] dram_rdata_r;
   always @(posedge clk)
-    if(bus_cycle_r != 0)
-      dramctl_bus_data <= dram_rdata_r[bus_cycle_r*64+:64];
+    if(bus_cycle_r != 7)
+      dramctl_bus_data <= dram_rdata_r[(bus_cycle_r+1)*64+:64];
 
   reg dramclk;
   initial

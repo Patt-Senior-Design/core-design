@@ -114,6 +114,7 @@ module l2trans #(
 
   // bus interface
   assign l2_bus_req = (req_valid_r & ~req_sent_r &
+                       (~snoop_valid_r | snoop_sent_r) &
                        (~req_flush | req_data_ready_r)) |
                       (snoop_valid_r & ~snoop_sent_r &
                        snoop_data_ready_r);

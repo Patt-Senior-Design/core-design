@@ -48,9 +48,10 @@ def getCmpResult(entry: MemoryEntry, ram: list) -> int:
     result = 0
     for i in range(8):
         word = ram[base-RAMBASE]
-        for j in range(2):
+        for j in range(4):
             result = (result >> 1) | (0x80000000 if ((word & 0xff) == byte) else 0)
             word >>= 8
+        base += 1
     return result
 
 class MemoryTrace:

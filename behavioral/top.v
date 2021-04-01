@@ -29,7 +29,7 @@ module top();
   // memory map constants
   localparam
     ROM_BASE   = 32'h10000000/4,
-    ROM_SIZE   = (256*1024)/4,
+    ROM_SIZE   = (16*1024*1024)/4,
     DBG_TOHOST = 32'h30000000/4;
 
   task automatic openargfile(
@@ -232,6 +232,7 @@ module top();
       12'h7d2: csr_name = "mbfstarg";
       12'h7d3: csr_name = "mbfsqbase";
       12'h7d4: csr_name = "mbfsqsize";
+      12'h7e0: csr_name = "ml2stat";
       12'hb00: csr_name = "mcycle";
       12'hb02: csr_name = "minstret";
       12'hb80: csr_name = "mcycleh";
@@ -320,7 +321,7 @@ module top();
 
   always @(posedge clk) begin
     watchdog = watchdog + 1;
-    if(watchdog > 2000) begin
+    if(watchdog > 5000) begin
       $display("\nERROR: 2000 cycles elapsed since last insn retired. Terminating.\n");
       $finish;
     end

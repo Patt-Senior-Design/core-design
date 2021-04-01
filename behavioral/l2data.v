@@ -188,7 +188,11 @@ module l2data(
                              (~req_burst |
                               (~(s0_req_ren & s0_req_wen) &
                                (s0_req_beat_r == 7))));
-  assign l2data_req_wdata_ready = ~s0_req_valid_r | s0_req_issue;
+  assign l2data_req_wdata_ready = ~s0_req_valid_r |
+                                  (s0_req_issue &
+                                   (~req_burst | s0_req_overwrite |
+                                    (~(s0_req_ren & s0_req_wen) &
+                                     (s0_req_beat_r == 7))));
   assign l2data_snoop_ready = ~s0_snoop_valid_r | (s0_snoop_beat_r == 7);
 
   assign l2data_flush_hit = s0_flush_hit | s1_flush_hit | s2_flush_hit;

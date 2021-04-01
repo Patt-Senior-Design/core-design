@@ -12,45 +12,47 @@ DRAMCFG=$DIR/dramsim/DDR4_4Gb_x16_2666_2.ini
 HEXFILE=$DIR/tests/$TEST.hex
 ELFFILE=$DIR/tests/$TEST.elf
 LOGFILE=$DIR/tests/$TEST.log
-DIFFFILE=$DIR/tests/$TEST.diff
+UARTFILE=$DIR/tests/$TEST.out
 
 make -C $DIR/tests || exit $?
 make -C $DIR/behavioral || exit $?
 
-rm -f simtrace spiketrace
+rm -f simtrace
 
-TIMEOUT=120
+TIMEOUT=100000
 
 mkfifo simtrace
-timeout $TIMEOUT $DIR/behavioral/build/top +dramcfg=$DRAMCFG +memfile=$HEXFILE +tracefile=simtrace +logfile=$LOGFILE &
+timeout $TIMEOUT $DIR/behavioral/build/top +dramcfg=$DRAMCFG +memfile=$HEXFILE +tracefile=simtrace +logfile=$LOGFILE +uartfile=$UARTFILE &
 SIMPID=$!
 
-mkfifo spiketrace
-timeout $TIMEOUT $DIR/runspike.sh --log-commits $ELFFILE 2> spiketrace &
+timeout $TIMEOUT $DIR/runspike.sh --log-commits --cosim=simtrace $ELFFILE 2>/dev/null &
 SPIKEPID=$!
 
-# ignore the lines from the spike boot rom
-$DIR/checktrace.py > $DIFFFILE
-DIFFSTATUS=$?
-
-rm simtrace spiketrace
+ERROR=0
 
 wait $SIMPID
 if [ $? -eq 124 ]; then
-    echo "iverilog timed out" >> $DIFFFILE
-    DIFFSTATUS=1
+    echo "ERROR: rtl timed out"
+    ERROR=1
 fi
 
-wait $SPIKEPID
-if [ $? -eq 124 ]; then
-    echo "spike timed out" >> $DIFFFILE
-    DIFFSTATUS=1
+wait $SPIKEPID; SPIKESTATUS=$?
+if [ $SPIKESTATUS -eq 124 ]; then
+    echo "ERROR: spike timed out"
+    ERROR=1
+elif [ $SPIKESTATUS -ne 0 ]; then
+    echo "ERROR: spike exited with non-zero status"
+    ERROR=1
 fi
 
-$DIR/checkmem.py $LOGFILE >> $DIFFFILE
+rm -f simtrace
+$DIR/checkmem.py $LOGFILE
 if [ $? -ne 0 ]; then
-    DIFFSTATUS=1
+    ERROR=1
 fi
 
-head -n30 $DIFFFILE
-exit $DIFFSTATUS
+if [ $ERROR -ne 0 ]; then
+    echo "TEST FAILED"
+fi
+
+exit $ERROR

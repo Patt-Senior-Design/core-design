@@ -51,8 +51,8 @@ module rob(
   // csr interface
   input [31:2]  csr_tvec,
   output        rob_ret_valid,
+  output        rob_ret_csr,
   output        rob_csr_valid,
-  output [6:0]  rob_csr_head,
   output [31:2] rob_csr_epc,
   output [4:0]  rob_csr_ecause,
   output [31:0] rob_csr_tval);
@@ -106,7 +106,7 @@ module rob(
   assign decode_beat = decode_rob_valid & ~rob_full;
 
   wire br_result;
-  assign br_result = ret_result[0] ^ ret_retop[5];
+  assign br_result = ret_result[0] ^ ret_retop[0];
 
   wire ret_exc, ret_mispred;
   assign ret_exc = ret_valid & ret_error;
@@ -127,11 +127,11 @@ module rob(
 
   // csr interface
   assign rob_ret_valid = ret_valid & ~ret_error;
+  assign rob_ret_csr = rob_ret_valid & ret_retop[5];
   assign rob_csr_valid = ret_exc;
   assign rob_csr_epc = ret_addr;
   assign rob_csr_ecause = ret_ecause;
   assign rob_csr_tval = 0; // TODO
-  assign rob_csr_head = buf_head;
 
   // rat interface
   assign rob_ret_commit = rob_ret_valid & ~ret_rd[5];
@@ -139,12 +139,12 @@ module rob(
   assign rob_ret_result = ret_forwarded ? {ret_target,2'b0} : ret_result;
 
   // brpred interface
-  assign rob_ret_branch = ret_valid & ret_retop[6];
+  assign rob_ret_branch =rob_ret_valid & ret_retop[6];
   assign rob_ret_bptag = ret_bptag;
   assign rob_ret_bptaken = br_result;
 
   // lsq interface (out)
-  assign rob_ret_store = ret_valid & ~ret_error & ret_retop[3];
+  assign rob_ret_store = rob_ret_valid & ret_retop[3];
 
   // buf_head
   always @(posedge clk)

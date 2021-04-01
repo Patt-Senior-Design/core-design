@@ -23,8 +23,8 @@ module csr(
   // rob interface
   input         rob_flush,
   input         rob_ret_valid,
+  input         rob_ret_csr,
   input         rob_csr_valid,
-  input [6:0]   rob_csr_head,
   input [31:2]  rob_csr_epc,
   input [4:0]   rob_csr_ecause,
   input [31:0]  rob_csr_tval,
@@ -37,7 +37,10 @@ module csr(
   output [31:0] csr_bfs_wdata,
   input         bfs_csr_valid,
   input         bfs_csr_error,
-  input [31:0]  bfs_csr_rdata);
+  input [31:0]  bfs_csr_rdata,
+
+  // l2fifo interface
+  input         l2fifo_l2_req);
 
   localparam
     MCYCLE    = 12'hB00,
@@ -51,7 +54,8 @@ module csr(
     MBFSROOT  = 12'h7D1,
     MBFSTARG  = 12'h7D2,
     MBFSQBASE = 12'h7D3,
-    MBFSQSIZE = 12'h7D4;
+    MBFSQSIZE = 12'h7D4,
+    ML2STAT   = 12'h7E0;
 
   // uart status bits
   localparam
@@ -103,6 +107,7 @@ module csr(
   reg sel_minstret, sel_minstreth;
   reg sel_muartstat, sel_muartrx, sel_muarttx;
   reg sel_bfs;
+  reg sel_ml2stat;
   reg sel_none;
   always @(*) begin
     sel_mcycle = 0;
@@ -113,6 +118,7 @@ module csr(
     sel_muartrx = 0;
     sel_muarttx = 0;
     sel_bfs = 0;
+    sel_ml2stat = 0;
     sel_none = 0;
     casez(addr)
       MCYCLE: sel_mcycle = 1;
@@ -123,6 +129,7 @@ module csr(
       MUARTRX: sel_muartrx = 1;
       MUARTTX: sel_muarttx = 1;
       12'h7D?: sel_bfs = 1;
+      ML2STAT: sel_ml2stat = 1;
       default: sel_none = 1;
     endcase
   end
@@ -137,6 +144,7 @@ module csr(
       sel_muartstat: csr_result = MUARTSTAT_TXEMPTY | MUARTSTAT_RXEMPTY;
       sel_muarttx: csr_result = {24'b0,muarttx};
       sel_bfs: csr_result = bfs_csr_rdata;
+      sel_ml2stat: csr_result = {31'b0,l2fifo_l2_req};
       default: csr_result = 0;
     endcase
 
@@ -169,13 +177,23 @@ module csr(
     else
       bfs_req_r <= csr_bfs_valid;
 
+  wire l2fifo_stall;
+  assign l2fifo_stall = wen & sel_ml2stat & l2fifo_l2_req;
+
+  reg l2fifo_stall_r;
+  always @(posedge clk)
+    if(rst | ~l2fifo_l2_req)
+      l2fifo_stall_r <= 0;
+    else if(wen & sel_ml2stat)
+      l2fifo_stall_r <= 1;
+
   // csrrs/c not supported
   assign csr_bfs_valid = valid & ~op[1] & sel_bfs & ~bfs_req_r;
   assign csr_bfs_addr = addr[3:0];
   assign csr_bfs_wen = wen;
   assign csr_bfs_wdata = op1;
 
-  assign csr_stall = csr_bfs_valid;
+  assign csr_stall = csr_bfs_valid | l2fifo_stall | l2fifo_stall_r;
   assign csr_error = sel_none | wr_error |
                      (bfs_req_r & (~bfs_csr_valid | bfs_csr_error));
   assign csr_ecause = 0; // TODO
@@ -195,12 +213,13 @@ module csr(
     end
   end
 
+  wire inc_minstret;
+  assign inc_minstret = rob_ret_valid & ~(rob_ret_csr & (addr === MINSTRET));
   // Update CSR logic
   always @(*) begin
     // Passive updates
     {mcycleh_n, mcycle_n} = {mcycleh, mcycle} + 1;
-    {minstreth_n, minstret_n} = {minstreth, minstret} + (rob_ret_valid & (rob_csr_head !== robid) & 
-                            (addr == MINSTRET));
+    {minstreth_n, minstret_n} = {minstreth, minstret} + (inc_minstret);
 
     // Active updates: CSR instructions (overrides passive)
     if(wen)

@@ -323,14 +323,16 @@ module dcache(
     // if there are any invalid ways, use those instead of lru bits
     if(s0_invalid_way_avail)
        s0_mshr_alloc_way = s0_invalid_way_sel;
-    else
+    else begin
       // compute lru way
+      s0_mshr_alloc_way = 0;
       casez(s0_tagmem_lru)
         3'b0?0: s0_mshr_alloc_way[0] = 1;
         3'b0?1: s0_mshr_alloc_way[1] = 1;
         3'b10?: s0_mshr_alloc_way[2] = 1;
         3'b11?: s0_mshr_alloc_way[3] = 1;
       endcase
+    end
 
   // s0_stall
   always @(*) begin
@@ -390,7 +392,7 @@ module dcache(
 
   // s0_cycle_r
   always @(posedge clk)
-    if(rst)
+    if(rst | lsq_dc_flush)
       s0_cycle_r <= 0;
     else if(s0_burst_beat)
       s0_cycle_r <= s0_cycle_r + 1;
@@ -511,7 +513,7 @@ module dcache(
       // valid bits
       if(fill_done)
         tagmem_valid[addr2set({mshr_addr,4'b0})][oh2idx(mshr_way)] <= 1;
-      else if(~s0_wen & fill_wen)
+      else if((~s0_wen | s0_stall) & fill_wen)
         tagmem_valid[addr2set({mshr_addr,4'b0})][oh2idx(mshr_way)] <= 0;
       else if(s0_req_r & s0_inv_r & ~s0_mshrhit & ~s0_tagmiss)
         tagmem_valid[addr2set(s0_addr_r[31:2])][oh2idx(s0_taghits)] <= 0;
@@ -605,7 +607,7 @@ module dcache(
         rbuf_data[rbuf_tail[2:0]] <= l2_resp_rdata;
       end
 
-      if(~s0_wen & fill_wen) begin
+      if((~s0_wen | s0_stall) & fill_wen) begin
         rbuf_head <= rbuf_head + 1;
         rbuf_filled <= {rbuf_filled[6:0],1'b1};
       end

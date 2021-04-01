@@ -1,73 +1,179 @@
+`include "buscmd.vh"
+
 module bfs_queue #(
-  parameter Q_SIZE = 128
+  parameter MAINQ_SIZE = 128,
+  parameter BUFQ_SIZE = 64
   )(
   input        clk,
   input        bfs_rst,
 
   // core interface
+  input        active,
   input [1:0]  enqueue_req,
   input [63:0] wdata_in,
   input        dequeue_req,
   output [31:0] rdata_out,
   output       queue_full,
-  output       queue_empty);
+  output       rqueue_empty,
+  output       pend_empty,
+  // spill signals
+  output       spill_req,
+  output       spill_done,
+  output       spill_op,
+  output [63:0] spill_data,
 
-  reg [31:0]      buf_addr0[Q_SIZE-1:0];
-  reg [31:0]      buf_addr1[Q_SIZE-1:0];
-  reg [Q_SIZE-1:0] buf_valid0;
-  reg [Q_SIZE-1:0] buf_valid1;
+  // cache interface
+  input       dc_valid,
+  input [1:0] dc_op,
+  input       dc_ready,
+  input [63:0]  dc_rdata,
+  input       dc_rbuf_empty);
 
-  wire [$clog2(Q_SIZE)-1:0] enq_idx;
-  assign enq_idx = bfs_rst ? 0 : buf_tail;
+  localparam
+    CORE = 3'b000,
+    INIT_SPILL = 3'b010,
+    SPILL = 3'b110,
+    INIT_RESTORE = 3'b011,
+    RESTORE = 3'b111;
 
-  // Enqueue[0]: low 32 bits of wdata_in; Enqueue[1]: high 32 bits of wdata_in
-  always @(posedge clk) begin
-    if (bfs_rst) begin 
-      buf_valid0 <= 0;
-      buf_valid1 <= 0;
-    end else if (dequeue_req & ~queue_empty) begin  // Dequeuing
-      buf_valid0[buf_head] <= 0;
-      if (head_single)
-        buf_valid1[buf_head] <= 0; 
-    end
-    // Enqueuing happens along with bfs_rst for initial insertion of from node
-    if (|enqueue_req & (~queue_full | bfs_rst)) begin
-      {buf_valid0[enq_idx], buf_valid1[enq_idx]} <= enqueue_req;
-      buf_addr0[enq_idx] <= wdata_in[63:32];
-      buf_addr1[enq_idx] <= wdata_in[31:0];
-    end
-  end
+  // Main Q: Enq from core, deq to core
+  wire [1:0]  mq_enq_req;
+  wire        mq_deq_req;
+  wire [31:0] mq_deq_data;
+  wire       mq_full;
+  wire       mq_empty;
+
+  // Out Q: Enq from core, deq to memory 
+  wire [1:0]  outq_enq_req;
+  reg        outq_deq_req;
+  wire [63:0] outq_deq_data;
+  wire        outq_filled;
+  wire       outq_sat;
+  wire       outq_full;
+  wire       outq_empty;
+
+  // In Q: Enq from memory, deq to core
+  reg [1:0]  inq_enq_req;
+  reg [63:0] inq_enq_data;
+  wire        inq_deq_req;
+  wire [31:0] inq_deq_data;
+  wire       inq_full;
+  wire       inq_empty;
 
 
-  wire [$clog2(Q_SIZE):0]  buf_head_next, buf_tail_next;
-  reg [$clog2(Q_SIZE)-1:0] buf_head, buf_tail;
-  reg                     buf_head_pol, buf_tail_pol;
-  wire                    head_single;
-  assign head_single = ~buf_valid0[buf_head] & buf_valid1[buf_head];
 
-  assign buf_tail_next = (|enqueue_req & ~queue_full) ? 
-                            {buf_tail_pol, buf_tail} + 1 : {buf_tail_pol, buf_tail};
-  assign buf_head_next = (dequeue_req & ~queue_empty & head_single) ? 
-                            {buf_head_pol, buf_head} + 1 : {buf_head_pol, buf_head};
+  assign mq_enq_req = enqueue_req;
+  assign mq_deq_req = dequeue_req;
+  queue_main #(.Q_SIZE(MAINQ_SIZE)) main_q (
+    .clk(clk),
+    .bfs_rst(bfs_rst),
+    .enqueue_req (mq_enq_req),
+    .wdata_in (wdata_in),
+    .dequeue_req (mq_deq_req),
+    .rdata_out (mq_deq_data),
+    .queue_full (mq_full),
+    .queue_empty (mq_empty));
 
-  // buf sequencing
+  assign outq_enq_req = (mq_full ? enqueue_req : 2'b00);
+  //assign outq_deq_req = ~inq_full & ~outq_empty;
+  queue_out #(.Q_SIZE(BUFQ_SIZE)) out_q (
+    .clk(clk),
+    .bfs_rst(bfs_rst),
+    .enqueue_req (outq_enq_req),
+    .wdata_in (wdata_in),
+    .dequeue_req (outq_deq_req),
+    .rdata_out (outq_deq_data),
+    .rdata_filled(outq_filled),
+    .queue_sat (outq_sat),
+    .queue_full (outq_full),
+    .queue_empty (outq_empty));
+
+  assign inq_deq_req = (mq_empty ? dequeue_req : 1'b0);
+  queue_main #(.Q_SIZE(BUFQ_SIZE)) in_q (
+    .clk(clk),
+    .bfs_rst(bfs_rst),
+    .enqueue_req (inq_enq_req),
+    .wdata_in (inq_enq_data),
+    .dequeue_req (inq_deq_req),
+    .rdata_out (inq_deq_data),
+    .queue_full (inq_full),
+    .queue_empty (inq_empty));
+
+
+  /* State machine controller for spilling */
+  reg[2:0] qstate, next_qstate;
+  reg[2:0] ct, next_ct;
+
+  wire restore_valid;
+  assign restore_valid = dc_valid & (dc_op == `OP_RD);
+
+  wire spill_cond;
+  assign spill_cond = outq_sat & inq_full;
+
   always @(posedge clk) begin
     if (bfs_rst) begin
-      {buf_head_pol, buf_head} <= 0;
-      {buf_tail_pol, buf_tail} <= |enqueue_req ? 1 : 0; // Initial insertion of from node
+      qstate <= CORE;
+      ct <= 0;
     end else begin
-      {buf_head_pol, buf_head} <= buf_head_next;
-      {buf_tail_pol, buf_tail} <= buf_tail_next;
+      qstate <= next_qstate;
+      ct <= next_ct;
     end
   end
 
+  wire single_final;
+  assign single_final = dc_rbuf_empty & inq_empty & mq_empty & ~outq_filled & ~outq_empty;
 
-  wire wraparound = (buf_head_pol ^ buf_tail_pol);
-  wire pt_eq = (buf_head === buf_tail);
+  always @(*) begin
+    outq_deq_req = 0;
+    inq_enq_req = 0;
+    inq_enq_data = 0;
+    next_qstate = qstate;
+    next_ct = ct;
+    casez(qstate)
+      CORE: begin
+        // FORWARDING
+        outq_deq_req = ~inq_full & (outq_filled | single_final);
+        inq_enq_req = outq_deq_req ? {~single_final, 1'b1} : 2'b00;
+        inq_enq_data = outq_deq_data;
+        // Spill only when inq full and outq saturated, restore when queues empty
+        casez({spill_cond, pend_empty})
+          2'b00: next_qstate = CORE;
+          2'b01: next_qstate = INIT_RESTORE;
+          2'b10: next_qstate = INIT_SPILL;
+        endcase
+      end
+      INIT_SPILL: begin
+        next_ct = 6;
+        outq_deq_req = dc_ready;
+        next_qstate = (dc_ready ? SPILL : INIT_SPILL);
+      end
+      INIT_RESTORE: begin
+        next_ct = 7;
+        next_qstate = (dc_ready ? RESTORE : INIT_RESTORE);
+      end
+      RESTORE: begin
+        next_ct = dc_valid ? (ct - 1) : ct;
+        inq_enq_req = {2{dc_valid}};
+        inq_enq_data = dc_rdata;
+        next_qstate = ((~dc_valid | (ct != 0)) ? RESTORE : CORE);
+      end
+      SPILL: begin
+        next_ct = dc_ready ? (ct - 1) : ct;
+        outq_deq_req = dc_ready;
+        next_qstate = ((~dc_ready | (ct != 0)) ? SPILL : CORE);
+      end
+    endcase
+  end
 
-  assign rdata_out = buf_valid0[buf_head] ? buf_addr0[buf_head] : buf_addr1[buf_head];
-  assign queue_full = (wraparound & pt_eq);
-  assign queue_empty = (~wraparound & pt_eq);
+  assign queue_full = mq_full; // Debugging
+  assign rqueue_empty = mq_empty & inq_empty;
+  assign pend_empty = active & inq_empty & mq_empty & outq_empty & dc_rbuf_empty;
+  
+  assign spill_req = (qstate == INIT_SPILL) | (qstate == INIT_RESTORE) | (qstate == SPILL);
+  assign spill_done = (ct == 0) & (((qstate == SPILL) & dc_ready) | ((qstate == RESTORE) & dc_valid));
+  assign spill_op = qstate[0]; // 0 for spill, 1 for restore
+  assign spill_data = outq_deq_data;
 
+  assign rdata_out = mq_empty ? inq_deq_data : mq_deq_data;
 
- endmodule 
+endmodule 

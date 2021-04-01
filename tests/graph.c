@@ -10,6 +10,10 @@
 #define N_MAX 14
 #define SEARCHES 32
 
+// BFS memory region
+#define BFSQBASE (0x20000000 + (96ul*1024*1024)) // RAM_BASE + HEAP_MAX
+#define BFSQSIZE (8ul*1024*1024)
+
 typedef struct Node_t {
   uint32_t marked;
   uint32_t neigh_ct;
@@ -70,16 +74,39 @@ bool add_edge (struct Graph* graph, uint32_t from, uint32_t to) {
   return 0;
 }
 
+void putint(uint32_t val) {
+  char buf[10];
+
+  int len = 0;
+  do {
+    buf[len++] = '0' + (val % 10);
+    val /= 10;
+  } while(val);
+
+  do {
+    putchar(buf[--len]);
+  } while(len);
+}
+
+void puthex32(uint32_t val) {
+  for(int i=28;i>=0;i-=4) {
+    char c = '0' + ((val >> i) & 0xf);
+    if(c > '9') {c += ('a' - '9') - 1;}
+    putchar(c);
+  }
+}
 
 void print_graph(struct Graph* graph) {
   puts("=== GRAPH STRUCTURE ===");
   for (int i = 0; i < graph->size; i++) {
     Node* cur_node = graph->nodes + i;
-    printf("%d(%u) : ", i, cur_node->neigh_ct);
+    puthex32((uint32_t) cur_node);
+    fputs(": ", stdout);
     for (int j = 0; j < cur_node->neigh_ct; j++) {
-      printf("%u, ", getNodeId(graph, cur_node->neighbors[j]));
+      puthex32((uint32_t) cur_node->neighbors[j]);
+      putchar(' ');
     }
-    puts("");
+    putchar('\n');
   }
   puts("=======================");
 }
@@ -136,7 +163,7 @@ void init_bfs(struct Graph* graph, Queue* q, Node* from) {
 
 
 /* BFS Graph Traversal */
-uint32_t bfs_reachable(struct Graph* graph, Node* from, Node* to) {
+uint32_t bfs_reachable(struct Graph* graph, Node* from, Node* to, uint32_t *time) {
   uint32_t time_begin = read_csr(CSR_MCYCLE);
 
   Queue bfs_q;
@@ -146,27 +173,26 @@ uint32_t bfs_reachable(struct Graph* graph, Node* from, Node* to) {
   int found = 0;
   // Remove front of queue
   while (dequeue(&bfs_q, &cur_node)) {
-    uint32_t cur_node_id = getNodeId(graph, cur_node);
-    // Found destination
-    if (cur_node == to) {
-      found = 1;
-      break;
-    }
     uint32_t count = cur_node->neigh_ct;
-    //printf("Cur Node: %d, Neigh_Ct: %d\n", cur_node_id, count);
     Node** neighbors = cur_node->neighbors;
     for (int i = 0; i < count; i++) {
       Node* cur_neigh = neighbors[i];
-      // If not visited, add neighbors to queue
-      if (!cur_neigh->marked) {
-        enqueue(&bfs_q, cur_neigh);
+      if (cur_neigh->marked) {continue;}
+
+      // Found destination
+      if (cur_neigh == to) {
+        found = 1;
+        break;
       }
+
       // Mark node as visited
       cur_neigh->marked = 1;
+      enqueue(&bfs_q, cur_neigh);
     }
   }
 
   uint32_t time_diff = read_csr(CSR_MCYCLE) - time_begin;
+  *time = time_diff;
   if (found) {
     printf("Path found in %ld cycles\n", time_diff);
     return 1;
@@ -177,29 +203,38 @@ uint32_t bfs_reachable(struct Graph* graph, Node* from, Node* to) {
   }
 }
 
-bool bfs_wait_acc(void) {
-  for (int i = 0; i < 10000; i++) {
+bool bfs_wait_acc(uint32_t timeout) {
+  uint32_t time_begin = read_csr(CSR_MCYCLE);
+  while ((read_csr(CSR_MCYCLE) - time_begin) < timeout) {
     if (read_csr(CSR_MBFSSTAT) & MBFSSTAT_DONE) {return true;}
   }
   return false;
 }
 
-int32_t bfs_reachable_acc(struct Graph* graph, Node* from, Node* to) {
+int32_t bfs_reachable_acc(struct Graph* graph, Node* from, Node* to, uint32_t timeout) {
+  // Print entry time
+  printf("Enter bfs_reachable_acc at %ldns\n", read_csr(CSR_MCYCLE));
+
   // Wait for any previous search to complete
-  if (!bfs_wait_acc()) {return -1;}
+  if (!bfs_wait_acc(10000)) {return -1;}
 
   uint32_t time_begin = read_csr(CSR_MCYCLE);
   unmark_graph(graph);
 
+  // Ensure that writes have propagated to L2
+  write_csr(CSR_ML2STAT, 1);
+
   // Set BFS parameters
   write_csr(CSR_MBFSROOT, (uint32_t) from);
   write_csr(CSR_MBFSTARG, (uint32_t) to);
+  write_csr(CSR_MBFSQBASE, (uint32_t) BFSQBASE);
+  write_csr(CSR_MBFSQSIZE, (uint32_t) BFSQSIZE);
 
   // Start BFS
   write_csr(CSR_MBFSSTAT, 1);
 
   // Wait for search to complete
-  if (!bfs_wait_acc()) {return -1;}
+  if (!bfs_wait_acc(timeout)) {return -1;}
 
   uint32_t time_diff = read_csr(CSR_MCYCLE) - time_begin;
   printf("Accelerator ran in %ld cycles\n", time_diff);
@@ -243,8 +278,9 @@ int main (void) {
     Node* to = graph.nodes + getRandNodeId();
     printf("%d to %d: ", getNodeId(&graph, from), getNodeId(&graph, to));
 
-    uint32_t found = bfs_reachable(&graph, from, to);
-    int32_t found_acc = bfs_reachable_acc(&graph, from, to);
+    uint32_t time;
+    uint32_t found = bfs_reachable(&graph, from, to, &time);
+    int32_t found_acc = bfs_reachable_acc(&graph, from, to, time*2);
     if (found_acc < 0) {
       puts("ERROR: accelerator timed out.");
       return 1;

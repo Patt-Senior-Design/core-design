@@ -52,12 +52,6 @@ _start:
 	mv	x30, zero
 	mv	x31, zero
 
-	# Initialize csrs
-	csrw	mcycleh, zero
-	csrw	mcycle, zero
-	csrw	minstreth, zero
-	csrw	minstret, zero
-
 	# Initialize stack
 	la	sp, _stack-8
 	sw	zero, 0(sp)
