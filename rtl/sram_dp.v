@@ -1,1 +1,0 @@
-../behavioral/sram_dp.v

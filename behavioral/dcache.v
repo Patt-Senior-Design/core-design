@@ -399,12 +399,12 @@ module dcache(
 
   // s1 input latches
   always @(posedge clk)
-    if(rst) begin
+    if(rst | lsq_dc_flush) begin
       s1_req_r <= 0;
-      s1_wen_r <= 0;
+      s1_forward_r <= 0;
     end else if(~s1_stall) begin
-      s1_req_r <= s0_req_r & ~s0_op_r[0] & ~s0_mshrhit & ~s0_tagmiss & ~lsq_dc_flush;
-      s1_forward_r <= s0_req_r & ~s0_inv_r & (s0_rd_forward | ~pma_valid) & ~lsq_dc_flush;
+      s1_req_r <= s0_req_r & ~s0_op_r[0] & ~s0_mshrhit & ~s0_tagmiss;
+      s1_forward_r <= s0_req_r & ~s0_inv_r & (s0_rd_forward | ~pma_valid);
       s1_error_r <= ~pma_valid;
       s1_offset_r <= s0_addr_r[2:0];
       s1_op_r <= s0_op;

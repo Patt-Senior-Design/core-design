@@ -4,9 +4,10 @@
 #include <stdbool.h>
 #include <time.h>
 
-#define TABLE_SIZE (1 << 10)
+#define TABLE_BASE_SIZE (1 << 10)
+#define TABLE_CT 9
 #define VAL_RANGE 100000000
-#define SAMPLES 1000
+#define SAMPLES 10000
 #define PHASH_SHF 20
 
 /* LINKED LIST */
@@ -195,16 +196,6 @@ void free_hashset (HashSet* set) {
 }
 /* END OF HASHSET */
 
-// Returns 0 if not found, or else exec_time
-uint32_t find_in_set(HashSet* set, int32_t search_val, bool* found) {
-  uint32_t exec_time = 0;
-  // Measure time
-  asm("csrrw x0, mcycle, x0");
-  *found = findNode(set, search_val);
-  asm("csrrs %0, mcycle, x0" : "=r" (exec_time));
-  return exec_time;
-}
-
 
 void measure_perf (HashSet* set, int32_t* elems, int32_t elem_ct, uint32_t samples) {
   uint64_t total_exec_time = 0;
@@ -239,37 +230,39 @@ void measure_perf (HashSet* set, int32_t* elems, int32_t elem_ct, uint32_t sampl
 int main () {
   srand (1);
 
-  HashSet* set = create_hashset(TABLE_SIZE);
   uint32_t MAX_ELEM_CT = 0;
-  int lf_ct = 6;
+  int LF_CT = 6;
   float TARGET_LF[] = {0.5, 0.6, 0.7, 0.8, 0.9, 0.95};
-  // Note: target_lf[0] has to be greater than largest increment
-  int32_t* elems = (int32_t*) malloc ((uint32_t)(TABLE_SIZE * TARGET_LF[0] * sizeof(int32_t)));
 
-  printf("Table Size: %d\n", TABLE_SIZE);
-  for (int i = 0; i < lf_ct; i++) {
-    // Init params
-    float lf = TARGET_LF[i];
-    MAX_ELEM_CT = ((uint32_t) (TABLE_SIZE * lf)) - set->size;
-    printf("LF: %d ", (int)(lf * 100));
-
-    // Init hashset
+  for (int j = 0; j < TABLE_CT; j++) {
+    int table_size = TABLE_BASE_SIZE << j;
+    HashSet* set = create_hashset(table_size);
+    // Note: target_lf[0] has to be greater than largest increment
+    int32_t* elems = (int32_t*) malloc ((uint32_t)(table_size * sizeof(int32_t)));
     int32_t elem_ct = 0;
-    for (int32_t j = 0; j < MAX_ELEM_CT; j++) {
-      int32_t elem = rand() % VAL_RANGE;
-      bool success = insertNode(set, elem);
-      if (success) {
-        elems[elem_ct++] = elem;
-      }
-    }
-    printf("(Size: %ld) --> ", set->size); 
-    
-    // Perf stat
-    measure_perf (set, elems, elem_ct, SAMPLES);
-  }
+    printf("Table Size: %d\n", table_size);
+    for (int i = 0; i < LF_CT; i++) {
+      // Init params
+      float lf = TARGET_LF[i];
+      MAX_ELEM_CT = ((uint32_t) (table_size * lf)) - set->size;
+      printf("LF: %d ", (int)(lf * 100));
 
-  // Free memory
-  free(elems);
-  free_hashset(set);
+      // Init hashset
+      for (int32_t j = 0; j < MAX_ELEM_CT; j++) {
+        int32_t elem = rand() % VAL_RANGE;
+        bool success = insertNode(set, elem);
+        if (success) {
+          elems[elem_ct++] = elem;
+        }
+      }
+      printf("(Size: %ld) --> ", set->size); 
+      // Perf stat
+      measure_perf (set, elems, elem_ct, SAMPLES);
+    }
+    printf("\n");
+    // Free memory
+    free(elems);
+    free_hashset(set);
+  }
   return 0;
 }
