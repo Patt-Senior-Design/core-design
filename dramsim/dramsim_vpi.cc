@@ -151,6 +151,7 @@ static PLI_INT32 startsim_cb(p_cb_data cb_data) {
 
   // check conversion error
   double error = (period_sim - period_ns) / period_ns;
+  if(error < 0) {error = -error;}
   if(error > 0.05) {
     vpi_printf("ERROR: rounding error for dram clock period is too high, try increasing time precision\n");
     vpi_control(vpiFinish, 0);

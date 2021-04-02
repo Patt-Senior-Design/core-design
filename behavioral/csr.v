@@ -233,7 +233,7 @@ module csr(
 
   always @(posedge clk)
     if(valid & ~csr_error & wen)
-      top.trace_csr_write(
+      top.tb_trace_csr_write(
         robid,
         addr,
         wdata);
@@ -241,7 +241,7 @@ module csr(
   always @(posedge clk)
     if(wen & sel_muarttx) begin
       muarttx <= wdata;
-      top.uart_tx(wdata);
+      top.tb_uart_tx(wdata);
     end
 
 endmodule

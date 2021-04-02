@@ -533,7 +533,7 @@ module l2tag #(
   always @(posedge clk)
     if(rst)
       for(k = 0; k < 512; k=k+1)
-        tagmem_state[k] <= 0;
+        tagmem_state[k] = 0;
     else if(state_wen)
       tagmem_state[state_wset][oh2idx(state_wway)*3+:3] <= state_wdata;
 

@@ -506,8 +506,8 @@ module dcache(
   always @(posedge clk)
     if(rst)
       for(j = 0; j < 128; j=j+1) begin
-        tagmem_valid[j] <= 0;
-        tagmem_lru[j] <= 0;
+        tagmem_valid[j] = 0;
+        tagmem_lru[j] = 0;
       end
     else begin
       // valid bits
@@ -616,13 +616,13 @@ module dcache(
   // testbench callbacks
   always @(posedge clk) begin
     if(lsq_dc_req & dcache_lsq_ready)
-      top.log_dcache_req(
+      top.tb_log_dcache_req(
         lsq_dc_lsqid,
         lsq_dc_op,
         lsq_dc_addr,
         lsq_dc_wdata);
     if(dcache_lsq_valid)
-      top.log_dcache_resp(
+      top.tb_log_dcache_resp(
         dcache_lsq_lsqid,
         dcache_lsq_error,
         dcache_lsq_rdata);

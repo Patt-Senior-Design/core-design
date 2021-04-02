@@ -272,7 +272,7 @@ module decode(
 
   always @(posedge clk)
     if(valid & ~decode_stall)
-      top.trace_decode(
+      top.tb_trace_decode(
         decode_robid,
         insn,
         imm);

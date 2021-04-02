@@ -27,7 +27,7 @@ module icache(
 
       req_s1 <= req_s0;
       if(req_s0) begin
-        top.mem_read(addr_s0, rdata_raw);
+        top.tb_mem_read(addr_s0, rdata_raw);
         rdata_s1 <= rdata_raw;
       end
     end

@@ -214,7 +214,7 @@ module rob(
 
   always @(posedge clk) begin
     if(ret_valid)
-      top.trace_rob_retire(
+      top.tb_trace_rob_retire(
         buf_head,
         ret_retop,
         ret_addr,
@@ -224,7 +224,7 @@ module rob(
         ret_rd,
         rob_ret_result);
     if(rob_flush)
-      top.log_rob_flush();
+      top.tb_log_rob_flush();
   end
 
 endmodule

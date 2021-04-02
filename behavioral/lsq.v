@@ -327,7 +327,7 @@ module lsq(
             lq_base_rdy[j] <= 1;
             lq_base[j] <= wb_result;
 
-            top.trace_lsq_base(
+            top.tb_trace_lsq_base(
               {1'b0,j[3:0]},
               wb_result);
           end
@@ -378,7 +378,7 @@ module lsq(
               sq_base_rdy[k] <= 1;
               sq_base[k] <= wb_result;
 
-              top.trace_lsq_base(
+              top.tb_trace_lsq_base(
                 {1'b1,k[3:0]},
                 wb_result);
             end
@@ -387,7 +387,7 @@ module lsq(
               sq_data_rdy[k] <= 1;
               sq_data[k] <= wb_result;
 
-              top.trace_lsq_wdata(
+              top.tb_trace_lsq_wdata(
                 {1'b1,k[3:0]},
                 wb_result);
             end
@@ -396,7 +396,7 @@ module lsq(
 
   always @(posedge clk)
     if(rename_beat)
-      top.trace_lsq_dispatch(
+      top.tb_trace_lsq_dispatch(
         rename_robid,
         rename_op[3] ? {1'b1,sq_tail} : {1'b0,lq_insert_idx},
         rename_op,
@@ -405,7 +405,7 @@ module lsq(
 
   always @(posedge clk)
     if(~rst)
-      top.log_lsq_inflight(
+      top.tb_log_lsq_inflight(
         lq_valid,
         sq_valid);
 

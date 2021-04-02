@@ -2,12 +2,28 @@
 
 module top();
 
-  reg clk;
-  reg rst;
+  reg clk/*verilator public*/;
+  reg rst/*verilator public*/;
   cpu cpu(
     .clk(clk),
     .rst(rst));
 
+`ifdef VERILATOR
+  import "DPI-C" task tb_log_bus_cycle(input bit nack, input bit hit, input bit [2:0] cmd, input bit [4:0] tag, input bit [31:6] addr);
+  import "DPI-C" task tb_log_bus_data(input bit [2:0] index, input bit [63:0] data);
+  import "DPI-C" task tb_log_dcache_req(input bit [3:0] lsqid, input bit [3:0] op, input bit [31:0] addr, input bit [31:0] wdata);
+  import "DPI-C" task tb_log_dcache_resp(input bit [3:0] lsqid, input bit error, input bit [31:0] rdata);
+  import "DPI-C" task tb_log_lsq_inflight(input bit [15:0] lq_valid, input bit [15:0] sq_valid);
+  import "DPI-C" task tb_log_rob_flush();
+  import "DPI-C" task tb_mem_read(input bit [31:2] addr, output bit [31:0] rdata);
+  import "DPI-C" task tb_trace_csr_write(input bit [6:0] robid, input bit [11:0] addr, input bit [31:0] data);
+  import "DPI-C" task tb_trace_decode(input bit [6:0] robid, input bit [31:0] insn, input bit [31:0] imm);
+  import "DPI-C" task tb_trace_lsq_base(input bit [4:0] lsqid, input bit [31:0] base);
+  import "DPI-C" task tb_trace_lsq_dispatch(input bit [6:0] robid, input bit [4:0] lsqid, input bit [3:0] op, input bit [31:0] base, input bit [31:0] wdata);
+  import "DPI-C" task tb_trace_lsq_wdata(input bit [4:0] lsqid, input bit [31:0] wdata);
+  import "DPI-C" task tb_trace_rob_retire(input bit [6:0] robid, input bit [6:0] retop, input bit [31:2] addr, input bit error, input bit mispred, input bit [4:0] ecause, input bit [5:0] rd, input bit [31:0] result);
+  import "DPI-C" task tb_uart_tx(input bit [7:0] c);
+`else
   always
     #0.5 clk = ~clk;
 
@@ -16,7 +32,7 @@ module top();
     $dumpvars;
     $dumplimit(32*1024*1024*1024);
 
-    clk = 0;
+    clk = 1;
     rst = 1;
     #10;
     rst = 0;
@@ -78,7 +94,7 @@ module top();
   initial
     openargfile("uartfile", "w", uartfd, STDOUT);
 
-  task automatic mem_read(
+  task automatic tb_mem_read(
     input [31:2]      addr,
     output reg [31:0] rdata);
 
@@ -88,7 +104,7 @@ module top();
       rdata = 0;
   endtask
 
-  task uart_tx(
+  task tb_uart_tx(
     input [7:0] char);
 
     $fwrite(uartfd, "%c", char);
@@ -140,7 +156,7 @@ module top();
       trace_rob_inflight_hist[trace_rob_inflight]
         = trace_rob_inflight_hist[trace_rob_inflight] + 1;
 
-  task trace_decode(
+  task tb_trace_decode(
     input [6:0]  robid,
     input [31:0] insn,
     input [31:0] imm);
@@ -155,7 +171,7 @@ module top();
     end
   endtask
 
-  task trace_lsq_dispatch(
+  task tb_trace_lsq_dispatch(
     input [6:0] robid,
     input [4:0] lsqid,
     input [3:0] op,
@@ -171,7 +187,7 @@ module top();
     end
   endtask
 
-  task automatic trace_lsq_base(
+  task automatic tb_trace_lsq_base(
     input [4:0]  lsqid,
     input [31:0] base);
 
@@ -182,7 +198,7 @@ module top();
     end
   endtask
 
-  task trace_lsq_wdata(
+  task tb_trace_lsq_wdata(
     input [4:0]  lsqid,
     input [31:0] wdata);
 
@@ -193,7 +209,7 @@ module top();
     end
   endtask
 
-  task trace_csr_write(
+  task tb_trace_csr_write(
     input [6:0]  robid,
     input [11:0] addr,
     input [31:0] data);
@@ -248,7 +264,7 @@ module top();
   endfunction
 
   integer watchdog;
-  task trace_rob_retire(
+  task tb_trace_rob_retire(
     input [6:0]  robid,
     input [6:0]  retop,
     input [31:2] addr,
@@ -355,7 +371,7 @@ module top();
     end
   endtask
 
-  task log_dcache_req(
+  task tb_log_dcache_req(
     input [3:0]  lsqid,
     input [3:0]  op,
     input [31:0] addr,
@@ -387,7 +403,7 @@ module top();
     end
   endtask
 
-  task log_dcache_resp(
+  task tb_log_dcache_resp(
     input [3:0]  lsqid,
     input        error,
     input [31:0] rdata);
@@ -402,7 +418,7 @@ module top();
     end
   endtask
 
-  task log_rob_flush();
+  task tb_log_rob_flush();
     begin
       trace_rob_inflight = 0;
       if(logfd)
@@ -412,7 +428,7 @@ module top();
 
   reg [63:0] bus_data [0:7];
 
-  task log_bus_data(
+  task tb_log_bus_data(
     input [2:0]  index,
     input [63:0] data);
 
@@ -420,7 +436,7 @@ module top();
       bus_data[index] = data;
   endtask
 
-  task log_bus_cycle(
+  task tb_log_bus_cycle(
     input        nack,
     input        hit,
     input [2:0]  cmd,
@@ -452,7 +468,7 @@ module top();
     end
   endtask
 
-  task log_lsq_inflight(
+  task tb_log_lsq_inflight(
     input [15:0] lq_valid,
     input [15:0] sq_valid);
 
@@ -471,5 +487,6 @@ module top();
       trace_sq_inflight_hist[cnt] = trace_sq_inflight_hist[cnt] + 1;
     end
   endtask
+`endif
 
 endmodule

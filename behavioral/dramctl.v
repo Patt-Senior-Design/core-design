@@ -1,5 +1,26 @@
 `include "buscmd.vh"
 
+`ifdef VERILATOR
+import "DPI-C" function bit dramsim_cmdready(input bit write, input bit [31:2] addr);
+import "DPI-C" function void dramsim_cmddata(input bit write, input bit [4:0] tag, input bit [31:2] addr, input bit [64*8-1:0] data);
+import "DPI-C" function bit dramsim_respready();
+import "DPI-C" function void dramsim_respdata(output bit [4:0] tag, output bit [31:2] addr, output bit [64*8-1:0] data);
+
+`define INIT
+`define CMDREADY dramsim_cmdready
+`define CMDDATA dramsim_cmddata
+`define RESPREADY dramsim_respready
+`define RESPDATA dramsim_respdata
+
+`else
+
+`define INIT $dramsim$init(dramclk)
+`define CMDREADY $dramsim$cmdready
+`define CMDDATA $dramsim$cmddata
+`define RESPREADY $dramsim$respready
+`define RESPDATA $dramsim$respdata
+`endif
+
 // dram controller
 module dramctl(
   input             clk,
@@ -59,7 +80,7 @@ module dramctl(
 
   reg dramclk;
   initial
-    $dramsim$init(dramclk);
+    `INIT;
 
   wire [31:2] mem_addr;
   assign mem_addr = {bus_addr,4'b0} - RAM_BASE;
@@ -72,16 +93,13 @@ module dramctl(
   reg [4:0]  resp_tag_r;
   reg [31:2] resp_addr_r;
 
-  wire [31:2] resp_addr;
-  assign resp_addr = resp_addr_r + RAM_BASE;
-
   always @(posedge clk)
     if(rst) begin
       dramctl_bus_req <= 0;
       dramctl_bus_nack <= 0;
     end else if(bus_cycle_r == 3) begin
       if(cmd_relevant)
-        dramsim_ready = $dramsim$cmdready(cmd_write, mem_addr);
+        dramsim_ready = `CMDREADY(cmd_write, mem_addr);
       else
         dramsim_ready = 1;
 
@@ -93,17 +111,17 @@ module dramctl(
     end else if(bus_cycle_r == 0) begin
       // now that we have gathered any wdata, send request
       if(cmd_valid_r)
-        $dramsim$cmddata(cmd_write_r, cmd_tag_r, cmd_addr_r, bus_wdata_r);
+        `CMDDATA(cmd_write_r, cmd_tag_r, cmd_addr_r, bus_wdata_r);
     end else if(bus_cycle_r == 7) begin
       // previous cycle
       if(dramctl_bus_req & bus_dramctl_grant) begin
-        $dramsim$respdata(resp_tag_r, resp_addr_r, dram_rdata_r);
+        `RESPDATA(resp_tag_r, resp_addr_r, dram_rdata_r);
         dramctl_bus_tag <= resp_tag_r;
-        dramctl_bus_addr <= resp_addr[31:6];
+        dramctl_bus_addr <= (RAM_BASE/16) + resp_addr_r[31:6];
         dramctl_bus_data <= dram_rdata_r[63:0];
       end
       // this cycle
-      dramctl_bus_req <= $dramsim$respready();
+      dramctl_bus_req <= `RESPREADY();
       dramctl_bus_cmd <= `CMD_FILL;
     end
 
