@@ -7,6 +7,8 @@
 #include <svdpi.h>
 #include "Vtop__Dpi.h"
 
+#include <verilated_fst_c.h>
+
 #include <cstdint>
 #include <cstring>
 #include <cstdio>
@@ -27,6 +29,8 @@
 #define ROM_BASE (0x10000000/4)
 #define ROM_SIZE ((16*1024*1024)/4)
 #define DBG_TOHOST (0x30000000/4)
+
+typedef std::pair<uint64_t,uint64_t> range_t;
 
 static std::unordered_map<uint16_t,std::string> csr_names = {
   {0x300, "mstatus"},
@@ -63,10 +67,14 @@ static std::unordered_map<uint16_t,std::string> csr_names = {
   {0xfc1, "muartrx"},
 };
 
-static uint64_t simtime;
 static VerilatedContext* context;
 static Vtop* top;
 static DRAM* dram;
+
+static VerilatedFstC* dumper;
+static bool dump_running;
+static std::queue<uint64_t> dump_events;
+static uint64_t dump_next_event;
 
 static uint32_t mem_rom[ROM_SIZE];
 
@@ -103,8 +111,17 @@ static struct {
 
 static uint64_t bus_data[8];
 
+// Checks for a plusarg of the form +name
+static bool have_plusarg(const char* name) {
+  size_t len = strlen(name);
+  const char* arg = context->commandArgsPlusMatch(name);
+  if(arg[0] == '\0') {return false;}
+  if(arg[len+1] != '\0') {return false;}
+  return true;
+}
+
 // Returns the value of a plusarg of the form +name=value
-static const char* get_plusarg(const char* name) {
+static const char* get_plusarg_val(const char* name) {
   // Append '=' to end of name
   size_t len = strlen(name);
   char buf[len+2];
@@ -122,7 +139,7 @@ static const char* get_plusarg(const char* name) {
 
 static FILE* open_argfile(const char* argname, const char* mode,
                           FILE* defaultval) {
-  const char* filename = get_plusarg(argname);
+  const char* filename = get_plusarg_val(argname);
   if(filename[0] == '\0') {return defaultval;}
 
   FILE* result = fopen(filename, mode);
@@ -134,11 +151,65 @@ static FILE* open_argfile(const char* argname, const char* mode,
   return result;
 }
 
+// Syntax: +dumpranges=<base0>+<len0>,<base1>+<len1>,...
+static bool init_dump_ranges() {
+  // Parse dumpranges plusarg, if present
+  std::vector<range_t> dump_ranges;
+  const char* dump_ranges_str = get_plusarg_val("dumpranges");
+  while(dump_ranges_str[0] != '\0') {
+    // Parse one range
+    int scan_len;
+    uint64_t base, len;
+    if(sscanf(dump_ranges_str, "%lu+%lu%n", &base, &len, &scan_len) != 2) {
+      fprintf(stderr, "ERROR: bad syntax in dump ranges specification\n");
+      return false;
+    }
+    dump_ranges_str += scan_len;
+    if(dump_ranges_str[0] == ',') {dump_ranges_str++;}
+
+    // Check for overlapping ranges
+    uint64_t start = base;
+    uint64_t end = base + len;
+    for(auto& range : dump_ranges) {
+      if((start < range.first && end >= range.first) ||
+         (start <= range.second)) {
+        fprintf(stderr, "ERROR: overlapping dump ranges specified\n");
+        return false;
+      }
+    }
+
+    dump_ranges.emplace_back(start, end);
+  }
+
+  if(dump_ranges.empty()) {
+    // By default, dump for all time
+    printf("INFO: dumping for all time\n");
+    dump_running = true;
+    dump_next_event = (uint64_t) -1ll;
+    return true;
+  }
+
+  // Convert dump ranges to dump events
+  dump_running = false;
+  std::sort(dump_ranges.begin(), dump_ranges.end(),
+            [](const range_t& a, const range_t& b){return a.first < b.first;});
+  for(auto& range : dump_ranges) {
+    printf("INFO: dumping from time %lu to %lu\n", range.first, range.second);
+    dump_events.push(range.first);
+    dump_events.push(range.second);
+  }
+
+  dump_next_event = dump_events.front();
+  dump_events.pop();
+
+  return true;
+}
+
 static void print_stats() {
   puts("*** SUMMARY STATISTICS ***");
-  printf("Cycles elapsed: %ld\n", simtime);
+  printf("Cycles elapsed: %ld\n", context->time());
   printf("Instructions retired: %d\n", stats.instret);
-  printf("Average CPI: %.3f\n", ((double) simtime) / stats.instret);
+  printf("Average CPI: %.3f\n", ((double) context->time()) / stats.instret);
   printf("Branch prediction accuracy: %.2f\n",
          1.0 - (((double) stats.mispreds) / stats.branches));
 
@@ -167,25 +238,42 @@ static const char* get_csr_name(uint16_t addr) {
 }
 
 static void tick() {
+  if(context->time() == dump_next_event) {
+    dump_running = !dump_running;
+    if(!dump_events.empty()) {
+      dump_next_event = dump_events.front();
+      dump_events.pop();
+    } else {
+      dump_next_event = (uint64_t) -1ll;
+    }
+  }
+
   top->top->clk = 1;
   top->eval();
+  if(dump_running) {dumper->dump(context->time()*1000);}
+
   top->top->clk = 0;
   top->eval();
+  if(dump_running) {dumper->dump((context->time()*1000)+500);}
 
   dram->tick();
 
   if(!top->top->rst)
     stats.rob_inflight_hist[stats.rob_inflight]++;
 
-  simtime++;
+  context->timeInc(1);
 }
 
 int main(int argc, char** argv) {
-  // Parse cmdline args
+  bool error = false;
+
+  // Initialize context
   context = new VerilatedContext;
   context->commandArgs(argc, argv);
+  context->timeunit(-9);
+  context->timeprecision(-9);
 
-  // initialize ROM
+  // Initialize ROM
   FILE* romfile = open_argfile("memfile", "r", nullptr);
   if(romfile) {
     for(size_t i = 0; i < ROM_SIZE; i++) {
@@ -199,33 +287,52 @@ int main(int argc, char** argv) {
   tracefile = open_argfile("tracefile", "w", nullptr);
   logfile = open_argfile("logfile", "w", nullptr);
 
-    // Initialize models
+  // Initialize models
   top = new Vtop(context);
   dram = new DRAM(context, -9);
   if(!dram->initialized()) {
     fprintf(stderr, "ERROR: dramsim failed to initialize\n");
-    delete dram;
-    delete top;
-    delete context;
-    return 1;
+    error = true;
+    goto cleanup;
+  }
+
+  // Initialize dumper
+  if(have_plusarg("dumpon")) {
+    context->traceEverOn(true);
+    dumper = new VerilatedFstC;
+    dumper->set_time_unit("1ps");
+    dumper->set_time_resolution("1ps");
+    top->trace(dumper, 128); // 128 levels of hierarchy
+    dumper->open("top.fst");
+    if(!init_dump_ranges()) {
+      error = true;
+      goto cleanup;
+    }
+  } else {
+    dump_running = false;
+    dump_next_event = (uint64_t) -1ll;
   }
 
   // Reset models
-  simtime = 0;
+  context->time(0);
   top->top->clk = 0;
   top->top->rst = 1;
-  do {tick();} while(simtime < 10);
+  do {tick();} while(context->time() < 10);
   top->top->rst = 0;
 
   // Main sim loop
   while(!context->gotFinish()) {tick();}
 
+  top->final();
+  if(dumper) {dumper->close();}
   print_stats();
 
-  // Free models
+ cleanup:
   delete dram;
   delete top;
+  delete dumper;
   delete context;
+  return error ? 1 : 0;
 }
 
 // DPI functions
@@ -284,7 +391,7 @@ int tb_log_bus_cycle(svBit nack, svBit hit, const svBitVecVal* cmd,
     break;
   }
 
-  fprintf(logfile, "%ld bus %d:%d %0s %08x", simtime,
+  fprintf(logfile, "%ld bus %d:%d %0s %08x", context->time(),
           (*tag >> 3) & 0b11, *tag & 0b111, cmd_name, *addr << 6);
   if(*cmd == CMD_FILL || *cmd == CMD_FLUSH)
     for(int i = 0; i < 8; i++)
@@ -345,7 +452,7 @@ int tb_log_dcache_req(const svBitVecVal* lsqid, const svBitVecVal* op,
     break;
   }
 
-  fprintf(logfile, "%ld %0s %08x", simtime, mnemonic, *addr);
+  fprintf(logfile, "%ld %0s %08x", context->time(), mnemonic, *addr);
   if(*op & 1)
     fprintf(logfile, " %08x", *wdata);
   else {
@@ -362,7 +469,7 @@ int tb_log_dcache_resp(const svBitVecVal* lsqid, svBit error,
                        const svBitVecVal* rdata) {
   if(!logfile) {return 0;}
 
-  fprintf(logfile, "%ld resp %d", simtime, *lsqid);
+  fprintf(logfile, "%ld resp %d", context->time(), *lsqid);
   if(error)
     fputs(" error", logfile);
   else
@@ -393,7 +500,7 @@ int tb_log_lsq_inflight(const svBitVecVal* lq_valid,
 
 int tb_log_rob_flush() {
   if(logfile)
-    fprintf(logfile, "%ld flush\n", simtime);
+    fprintf(logfile, "%ld flush\n", context->time());
 
   stats.rob_inflight = 0;
 
@@ -519,7 +626,7 @@ int tb_trace_rob_retire(const svBitVecVal* robid, const svBitVecVal* retop,
 
   // Generate log output
   if(logfile) {
-    fprintf(logfile, "%ld ret %08x", simtime, *addr << 2);
+    fprintf(logfile, "%ld ret %08x", context->time(), *addr << 2);
     if(!((*rd >> 5) & 1))
       fprintf(logfile, " x%d=%08x", *rd & 0b11111, *result);
     fputc('\n', logfile);
