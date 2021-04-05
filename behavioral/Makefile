@@ -12,7 +12,7 @@ SIMOPTS += -o build/top_$(SIM)
 TARGET := build/top_$(SIM)
 else ifeq ($(SIM),verilator)
 SRCS += $(shell pwd)/top.cc $(DRAMSIM)/dramsim_verilator.cc
-SIMOPTS := --cc --exe --build --Mdir build/verilator --top top -Wno-fatal
+SIMOPTS := --cc --exe --build -j 4 --Mdir build/verilator --top top -Wno-fatal
 SIMOPTS += -CFLAGS "-I$(DRAMSIM) -I$(DRAMSIM)/DRAMsim3/src -march=native"
 SIMOPTS += -LDFLAGS "-L$(DRAMSIM)/DRAMsim3 -Wl,--push-state,--no-as-needed,--whole-archive -l:libdramsim3.a -Wl,--pop-state"
 SIMOPTS += -o top_$(SIM)
