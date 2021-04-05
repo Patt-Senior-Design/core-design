@@ -1,4 +1,4 @@
-SIM := verilator
+SIM := vcs
 DRAMSIM := $(shell pwd)/../dramsim
 SRCS := $(wildcard *.v) bfs/bfs_core.v bfs/bfs_queue.v bfs/queue_main.v bfs/queue_out.v
 
