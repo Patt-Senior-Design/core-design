@@ -3,15 +3,18 @@ module flop #(
   )(
   input clk,
   input rst,
+  input set,
   input enable, 
   input [width-1:0] d,
   output reg [width-1:0] q);
 
   always @(posedge clk) begin
+    if (enable)
+      q <= d;
+    if (set)
+      q <= 1;
     if (rst)
       q <= 0;
-    else if (enable)
-      q <= d;
   end
 
 endmodule
