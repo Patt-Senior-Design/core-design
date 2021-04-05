@@ -22,7 +22,7 @@ rm -f simtrace
 TIMEOUT=100000
 
 mkfifo simtrace
-timeout $TIMEOUT $DIR/behavioral/build/top_vcs +dramcfg=$DRAMCFG +memfile=$HEXFILE +tracefile=simtrace +logfile=$LOGFILE +uartfile=$UARTFILE &
+timeout $TIMEOUT $DIR/behavioral/build/top +dramcfg=$DRAMCFG +memfile=$HEXFILE +tracefile=simtrace +logfile=$LOGFILE +uartfile=$UARTFILE &
 SIMPID=$!
 
 timeout $TIMEOUT $DIR/runspike.sh --log-commits --cosim=simtrace $ELFFILE 2>/dev/null &

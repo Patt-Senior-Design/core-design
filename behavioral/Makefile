@@ -8,25 +8,23 @@ SIMOPTS := -full64 +v2k +warn=all +race=all -timescale=1ns/1ps -top top
 SIMOPTS += +vpi -CFLAGS "-I$(DRAMSIM)/DRAMsim3/src"
 SIMOPTS += -LDLFLAGS "-L$(DRAMSIM)/DRAMsim3 -Wl,--push-state,--no-as-needed,--whole-archive -l:libdramsim3.a -Wl,--pop-state"
 SIMOPTS += -P $(DRAMSIM)/pli.tab
-SIMOPTS += -o build/top_$(SIM)
-TARGET := build/top_$(SIM)
+SIMOPTS += -o build/top
 else ifeq ($(SIM),verilator)
 SRCS += $(shell pwd)/top.cc $(DRAMSIM)/dramsim_verilator.cc
-SIMOPTS := --cc --exe --build -j 4 --Mdir build/verilator --top top -Wno-fatal
+SIMOPTS := --cc --exe --build -j 4 --Mdir build --top top -Wno-fatal
 SIMOPTS += -CFLAGS "-I$(DRAMSIM) -I$(DRAMSIM)/DRAMsim3/src -march=native"
 SIMOPTS += -LDFLAGS "-L$(DRAMSIM)/DRAMsim3 -Wl,--push-state,--no-as-needed,--whole-archive -l:libdramsim3.a -Wl,--pop-state"
 SIMOPTS += --trace-fst --trace-threads 1 --trace-max-array 128
-SIMOPTS += -o top_$(SIM)
-TARGET := build/verilator/top_$(SIM)
+SIMOPTS += -o top
 else
 $(error Unknown simulator $(SIM))
 endif
 
 .PHONY: all clean
 
-all: $(TARGET)
+all: build/top
 
-$(TARGET): $(SRCS) build/cpu.v $(DRAMSIM)/DRAMsim3/libdramsim3.a
+build/top: $(SRCS) build/cpu.v $(DRAMSIM)/DRAMsim3/libdramsim3.a
 	$(SIM) $(SIMOPTS) $(SRCS) build/cpu.v
 
 build/%.v: $(SRCS) %.v.in | build
