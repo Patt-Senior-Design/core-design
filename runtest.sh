@@ -1,12 +1,13 @@
 #!/bin/sh
 
 if [ $# -lt 1 ]; then
-    echo "Usage: runtest.sh <test name>"
+    echo "Usage: runtest.sh <test name> <model: rtl/behavioral(default)"
     exit 1
 fi
 
 DIR=$(dirname $0)
 TEST=$1
+MODEL=${2:-behavioral}
 
 DRAMCFG=$DIR/dramsim/DDR4_4Gb_x16_2666_2.ini
 HEXFILE=$DIR/tests/$TEST.hex
@@ -22,7 +23,7 @@ rm -f simtrace
 TIMEOUT=100000
 
 mkfifo simtrace
-timeout $TIMEOUT $DIR/behavioral/build/top +dramcfg=$DRAMCFG +memfile=$HEXFILE +tracefile=simtrace +logfile=$LOGFILE +uartfile=$UARTFILE &
+timeout $TIMEOUT $DIR/$MODEL/build/top +dramcfg=$DRAMCFG +memfile=$HEXFILE +tracefile=simtrace +uartfile=$UARTFILE +logfile=$LOGFILE &
 SIMPID=$!
 
 timeout $TIMEOUT $DIR/runspike.sh --log-commits --cosim=simtrace $ELFFILE 2>/dev/null &

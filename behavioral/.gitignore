@@ -1,3 +1,5 @@
 build/*
 *.gtkw
 *.out
+*.static
+csrc
