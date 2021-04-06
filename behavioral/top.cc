@@ -14,6 +14,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <unordered_map>
+#include <time.h>
 
 #define ROB_SIZE 128
 #define LQ_SIZE 16
@@ -287,6 +288,10 @@ int main(int argc, char** argv) {
   tracefile = open_argfile("tracefile", "w", nullptr);
   logfile = open_argfile("logfile", "w", nullptr);
 
+  // Initialize time vars (must be done before gotos)
+  clock_t start = 0;
+  clock_t stop = 0;
+
   // Initialize models
   top = new Vtop(context);
   dram = new DRAM(context, -9);
@@ -313,6 +318,9 @@ int main(int argc, char** argv) {
     dump_next_event = (uint64_t) -1ll;
   }
 
+  // Start timer
+  start = clock();
+
   // Reset models
   context->time(0);
   top->top->clk = 0;
@@ -323,9 +331,16 @@ int main(int argc, char** argv) {
   // Main sim loop
   while(!context->gotFinish()) {tick();}
 
+  stop = clock();
+
   top->final();
   if(dumper) {dumper->close();}
   print_stats();
+
+  if(start != (clock_t) -1 && stop != (clock_t) -1) {
+    double freq = ((double) context->time()) / ((stop - start) / CLOCKS_PER_SEC);
+    printf("Simulation speed: %.3eHz\n", freq);
+  }
 
  cleanup:
   delete dram;
