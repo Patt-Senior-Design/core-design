@@ -19,6 +19,7 @@ module l2 #(
   output        l2_resp_valid,
   output        l2_resp_error,
   output [1:0]  l2_resp_op,
+  output [31:6] l2_resp_addr,
   output [63:0] l2_resp_rdata,
   input         resp_ready,
 
@@ -142,6 +143,7 @@ module l2 #(
   l2data l2data(
     /*AUTOINST*/
     // Outputs
+    .l2_resp_addr(l2_resp_addr),
     .l2_resp_error(l2_resp_error),
     .l2_resp_op(l2_resp_op),
     .l2_resp_rdata(l2_resp_rdata),

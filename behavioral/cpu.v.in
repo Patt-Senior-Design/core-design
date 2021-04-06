@@ -10,8 +10,9 @@ module cpu(
   wire [4:0]  bfs_bus_tag;
   wire [31:6] bfs_bus_addr;
   wire [63:0] bfs_bus_data;
-  wire [63:0] dc_rdata;
   wire [1:0]  dc_op;
+  wire [31:6] dc_addr;
+  wire [63:0] dc_rdata;
 
   brpred brpred(
     /*AUTOINST*/);
@@ -101,6 +102,7 @@ module cpu(
     .req_wdata({2{l2fifo_l2_wdata}}),
     .l2_req_ready(l2_l2fifo_ready),
     .l2_resp_op(),
+    .l2_resp_addr(),
     /*AUTOINST*/);
 
   bfs_core bfs(
@@ -110,12 +112,13 @@ module cpu(
     .req_valid(bfs_dc_req),
     .req_op(bfs_dc_op),
     .req_addr({bfs_dc_addr[31:6],4'd0}),
-    .req_wmask(bfs_dc_op[1] ? 8'b00000001 : 8'b11111111),
-    .req_wdata(bfs_dc_op[0] ? 64'h01 : bfs_dc_wdata),
+    .req_wmask(bfs_dc_op[1] ? 8'b10000000 : 8'b11111111),
+    .req_wdata(bfs_dc_op[0] ? 64'h01000000_00000000 : bfs_dc_wdata),
     .l2_req_ready(dc_ready),
     .l2_resp_valid(dc_valid),
     .l2_resp_error(),
     .l2_resp_op(dc_op),
+    .l2_resp_addr(dc_addr),
     .l2_resp_rdata(dc_rdata),
     .resp_ready(1'b1),
     .l2_inv_valid(),

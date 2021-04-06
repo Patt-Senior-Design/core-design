@@ -13,6 +13,7 @@
 #define CSR_MBFSTARG  "0x7d2"
 #define CSR_MBFSQBASE "0x7d3"
 #define CSR_MBFSQSIZE "0x7d4"
+#define CSR_MBFSRESULT "0x7d5"
 #define CSR_ML2STAT   "0x7e0"
 
 #define MUARTSTAT_RXEMPTY (0x00000001)

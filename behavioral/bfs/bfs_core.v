@@ -19,10 +19,13 @@ module bfs_core (
   output reg [31:0] bfs_dc_addr,
   output [63:0]     bfs_dc_wdata,
   input             dc_ready,
-  input [1:0]       dc_op,
-  input             dc_rbuf_empty,
+
   input             dc_valid,
-  input [63:0]      dc_rdata);
+  input [1:0]       dc_op,
+  input [31:6]      dc_addr,
+  input [63:0]      dc_rdata,
+
+  input             dc_rbuf_empty);
 
   localparam
     IDLE = 2'b00,
@@ -35,7 +38,8 @@ module bfs_core (
     REG_ROOT  = 4'd1,
     REG_TARG  = 4'd2,
     REG_QBASE = 4'd3,
-    REG_QSIZE = 4'd4;
+    REG_QSIZE = 4'd4,
+    REG_RESULT = 4'd5;
 
   reg[2:0] dc_beat;
   always @(posedge clk)
@@ -51,7 +55,6 @@ module bfs_core (
   wire active;
 
   // Queue interface
-  wire enq_hit;
   wire done;
   wire q_rst;
   reg [1:0] enq_req;
@@ -92,9 +95,10 @@ module bfs_core (
 
   // Input Regs
   reg[31:0] from_node;
-  reg[31:0] to_node;
+  reg[31:0] target_val;
   reg[31:0] sw_queue_base;
   reg[31:0] sw_queue_size;
+  reg[31:0] result;
 
   wire start;
   assign start = csr_bfs_valid & csr_bfs_wen & (csr_bfs_addr == REG_STAT);
@@ -111,10 +115,6 @@ module bfs_core (
       else
         swq_tail <= swq_tail + 64;
     end
-
-  assign enq_hit = (enq_req[0] & (enq_data[31:0] == to_node)) |
-                   (enq_req[1] & (enq_data[63:32] == to_node));
-  assign done = enq_hit | (pend_empty & (swq_head === swq_tail));
 
   // Cache
   assign bfs_dc_req = deq_req | spill_req;
@@ -141,14 +141,22 @@ module bfs_core (
   
   assign active = (state == NODE_HEADER | state == ADD_NEIGHS);
 
-  wire marked = dc_rdata[0];
-  wire [3:0] rdata_neigh_ct = dc_rdata[32+:4];
+  wire [31:0] rdata_value = dc_rdata[31:0];
+  wire [3:0]  rdata_neigh_ct = dc_rdata[32+:4];
+  wire        rdata_marked = dc_rdata[32+24];
+
+  wire rdata_valid;
+  assign rdata_valid = dc_fs & (dc_op == `OP_MARK) & ~rdata_marked;
 
   wire init_add_neighs; // If it has neighbors, unmarked, and frame start
-  assign init_add_neighs = (|rdata_neigh_ct & ~marked & dc_fs & (dc_op == `OP_MARK));
+  assign init_add_neighs = rdata_valid & (|rdata_neigh_ct);
   
   wire last_neigh_iter; // Either 1 or 2 neighs left
   assign last_neigh_iter = (~|neigh_ct[3:2] & ~(neigh_ct[1] & neigh_ct[0]));
+
+  wire rdata_hit;
+  assign rdata_hit = rdata_valid & (rdata_value == target_val);
+  assign done = rdata_hit | (pend_empty & (swq_head === swq_tail));
 
   always @(posedge clk) begin
     if (rst) begin
@@ -158,9 +166,10 @@ module bfs_core (
       // State latching
       state <= next_state;
       neigh_ct <= next_neigh_ct;
-      if (enq_hit) begin
+      if (rdata_hit) begin
         state <= IDLE;
         found <= 1;
+        result <= {dc_addr,6'b0};
       end else if (state == INIT)
         found <= 0;
     end
@@ -204,9 +213,10 @@ module bfs_core (
     case(csr_bfs_addr)
       REG_STAT: bfs_csr_rdata <= {30'b0,~active,found};
       REG_ROOT: bfs_csr_rdata <= from_node;
-      REG_TARG: bfs_csr_rdata <= to_node;
+      REG_TARG: bfs_csr_rdata <= target_val;
       REG_QBASE: bfs_csr_rdata <= sw_queue_base;
       REG_QSIZE: bfs_csr_rdata <= sw_queue_size;
+      REG_RESULT: bfs_csr_rdata <= result;
       default: bfs_csr_error <= 1;
     endcase
   end
@@ -215,9 +225,10 @@ module bfs_core (
     if(csr_bfs_valid & csr_bfs_wen)
       case(csr_bfs_addr)
         REG_ROOT: from_node <= csr_bfs_wdata;
-        REG_TARG: to_node <= csr_bfs_wdata;
+        REG_TARG: target_val <= csr_bfs_wdata;
         REG_QBASE: sw_queue_base <= csr_bfs_wdata;
         REG_QSIZE: sw_queue_size <= csr_bfs_wdata;
+        REG_RESULT: result <= csr_bfs_wdata;
       endcase
 
 endmodule

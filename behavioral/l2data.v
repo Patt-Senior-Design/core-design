@@ -46,6 +46,7 @@ module l2data(
   output        l2_resp_valid,
   output        l2_resp_error,
   output [1:0]  l2_resp_op,
+  output [31:6] l2_resp_addr,
   output [63:0] l2_resp_rdata,
   input         resp_ready,
 
@@ -212,7 +213,8 @@ module l2data(
   // l2 interface
   assign l2_resp_valid = s2_req_valid_r & ~s2_req_cmd_valid_r;
   assign l2_resp_error = 0;
-  assign l2_resp_op = s1_req_op_r;
+  assign l2_resp_op = s2_req_op_r;
+  assign l2_resp_addr = s2_req_addr_r;
   assign l2_resp_rdata = req_rdata;
 
   assign l2data_idle = ~s0_req_valid_r & ~s1_req_valid_r & ~s2_req_valid_r;
