@@ -53,7 +53,7 @@ module div(
   assign d_shf = {d_acc[30:0],~cmp_res[33]};
 
   // Result
-  reg [31:0] div_result;
+  wire [31:0] div_result;
   assign div_result = op[1] ? d_acc[63:32] : d_acc[31:0];
 
   // Outputs
