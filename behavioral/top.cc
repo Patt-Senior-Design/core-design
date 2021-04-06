@@ -406,11 +406,11 @@ int tb_log_bus_cycle(svBit nack, svBit hit, const svBitVecVal* cmd,
     break;
   }
 
-  fprintf(logfile, "%ld bus %d:%d %0s %08x", context->time(),
+  fprintf(logfile, "%lld bus %d:%d %s %08lx", context->time(),
           (*tag >> 3) & 0b11, *tag & 0b111, cmd_name, *addr << 6);
   if(*cmd == CMD_FILL || *cmd == CMD_FLUSH)
     for(int i = 0; i < 8; i++)
-      fprintf(logfile, " %08x", bus_data[i]);
+      fprintf(logfile, " %016llx", bus_data[i]);
   if(nack)
     fputs(" NACK", logfile);
   if(hit)
@@ -467,9 +467,9 @@ int tb_log_dcache_req(const svBitVecVal* lsqid, const svBitVecVal* op,
     break;
   }
 
-  fprintf(logfile, "%ld %0s %08x", context->time(), mnemonic, *addr);
+  fprintf(logfile, "%lld %s %08lx", context->time(), mnemonic, *addr);
   if(*op & 1)
-    fprintf(logfile, " %08x", *wdata);
+    fprintf(logfile, " %08lx", *wdata);
   else {
     if(*op == 0b0110 || *op == 0b1110) // lbcmp
       fprintf(logfile, " %2x", *wdata & 0xff);
@@ -484,11 +484,11 @@ int tb_log_dcache_resp(const svBitVecVal* lsqid, svBit error,
                        const svBitVecVal* rdata) {
   if(!logfile) {return 0;}
 
-  fprintf(logfile, "%ld resp %d", context->time(), *lsqid);
+  fprintf(logfile, "%lld resp %d", context->time(), *lsqid);
   if(error)
     fputs(" error", logfile);
   else
-    fprintf(logfile, " %08x", *rdata);
+    fprintf(logfile, " %08lx", *rdata);
   fputc('\n', logfile);
 
   return 0;
@@ -515,7 +515,7 @@ int tb_log_lsq_inflight(const svBitVecVal* lq_valid,
 
 int tb_log_rob_flush() {
   if(logfile)
-    fprintf(logfile, "%ld flush\n", context->time());
+    fprintf(logfile, "%lld flush\n", context->time());
 
   stats.rob_inflight = 0;
 
@@ -602,14 +602,14 @@ int tb_trace_rob_retire(const svBitVecVal* robid, const svBitVecVal* retop,
   rob_trace_t& rob_entry = rob_trace[*robid];
   uint32_t memaddr = rob_entry.membase + rob_entry.imm;
   if(tracefile) {
-    fprintf(tracefile, "core   0: 3 0x%08x (0x%08x)", *addr << 2, rob_entry.insn);
+    fprintf(tracefile, "core   0: 3 0x%08lx (0x%08lx)", *addr << 2, rob_entry.insn);
     if(error)
       fprintf(tracefile, " error %d", *ecause);
     else {
       if(!((*rd >> 5) & 1))
-        fprintf(tracefile, " x%2d 0x%08x", *rd & 0b11111, *result);
+        fprintf(tracefile, " x%2d 0x%08lx", *rd & 0b11111, *result);
       if(rob_entry.uses_mem) {
-        fprintf(tracefile, " mem 0x%08x", memaddr);
+        fprintf(tracefile, " mem 0x%08lx", memaddr);
         if((rob_entry.memop >> 3) & 1)
           switch(rob_entry.memop & 0b11) {
           case 0b00: // byte write
@@ -620,19 +620,19 @@ int tb_trace_rob_retire(const svBitVecVal* robid, const svBitVecVal* retop,
             fprintf(tracefile, " 0x%04x", rob_entry.memdata & 0xffff);
             break;
           default: // word write
-            fprintf(tracefile, " 0x%08x", rob_entry.memdata);
+            fprintf(tracefile, " 0x%08lx", rob_entry.memdata);
             break;
           }
         else if((rob_entry.memop & 0b11) == 0b11) {
           // lbcmp makes multiple sequential accesses
-          fprintf(tracefile, " mem 0x%08x", memaddr+8);
-          fprintf(tracefile, " mem 0x%08x", memaddr+16);
-          fprintf(tracefile, " mem 0x%08x", memaddr+24);
+          fprintf(tracefile, " mem 0x%08lx", memaddr+8);
+          fprintf(tracefile, " mem 0x%08lx", memaddr+16);
+          fprintf(tracefile, " mem 0x%08lx", memaddr+24);
         }
       }
       if(rob_entry.writes_csr) {
         const char* csr_name = get_csr_name(rob_entry.membase);
-        fprintf(tracefile, " c%d_%0s 0x%08x", rob_entry.membase,
+        fprintf(tracefile, " c%d_%s 0x%08lx", rob_entry.membase,
                 csr_name, rob_entry.memdata);
       }
     }
@@ -641,9 +641,9 @@ int tb_trace_rob_retire(const svBitVecVal* robid, const svBitVecVal* retop,
 
   // Generate log output
   if(logfile) {
-    fprintf(logfile, "%ld ret %08x", context->time(), *addr << 2);
+    fprintf(logfile, "%lld ret %08lx", context->time(), *addr << 2);
     if(!((*rd >> 5) & 1))
-      fprintf(logfile, " x%d=%08x", *rd & 0b11111, *result);
+      fprintf(logfile, " x%d=%08lx", *rd & 0b11111, *result);
     fputc('\n', logfile);
   }
 
