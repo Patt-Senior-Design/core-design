@@ -16,7 +16,7 @@ LOGFILE=$DIR/tests/$TEST.log
 UARTFILE=$DIR/tests/$TEST.out
 
 make -C $DIR/tests || exit $?
-make -C $DIR/behavioral || exit $?
+make -C $DIR/$MODEL || exit $?
 
 rm -f simtrace
 
