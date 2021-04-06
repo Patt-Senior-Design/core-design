@@ -84,7 +84,7 @@ module csr(
   reg [31:0] op1;
   reg [11:0] addr;
 
-  assign csr_valid = valid;
+  assign csr_valid = valid & ~csr_stall;
   assign csr_robid = robid;
   assign csr_rd = rd;
 
