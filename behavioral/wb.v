@@ -178,12 +178,17 @@ module wb(
   end
 
   always @(*) begin
-    wb_valid = 1;
     wb_scalu0_stall = scalu0_valid_r;
     wb_scalu1_stall = scalu1_valid_r;
     wb_mcalu0_stall = mcalu0_valid_r;
     wb_mcalu1_stall = mcalu1_valid_r;
     wb_lsq_stall    = lsq_valid_r;
+    wb_valid = 1;
+    wb_error = 0;
+    wb_ecause = 0;
+    wb_robid = 0;
+    wb_rd = 0;
+    wb_result = 0;
     if(rename_valid_r) begin
       wb_error  = 0;
       wb_ecause = 0;

@@ -85,10 +85,12 @@ module bus(
   reg       req_pri_r;
   reg [1:0] resp_pri_r;
 
+  /*verilator lint_off WIDTH*/
   wire [1:0] reqs_rot;
   wire [3:0] resps_rot;
   assign reqs_rot = rotate(reqs, req_pri_r, 2);
   assign resps_rot = rotate(resps, resp_pri_r, 4);
+  /*verilator lint_on WIDTH*/
 
   wire       reqarb_valid, resparb_valid;
   wire [1:0] reqarb_out;
@@ -102,10 +104,12 @@ module bus(
     .grant_valid(resparb_valid),
     .grant(resparb_out));
 
+  /*verilator lint_off WIDTH*/
   wire [1:0] reqarb_rot;
   wire [3:0] resparb_rot;
   assign reqarb_rot = rotate(reqarb_out, -req_pri_r, 2);
   assign resparb_rot = rotate(resparb_out, -resp_pri_r, 4);
+  /*verilator lint_on WIDTH*/
 
   reg [3:0] arb_out;
   always @(*) begin

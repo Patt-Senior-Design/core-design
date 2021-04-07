@@ -33,11 +33,13 @@ module rom(
   reg [31:6] cmd_addr_r;
   reg        resp_valid_r;
 
+  /*verilator lint_off WIDTH*/
   wire cmd_relevant;
   assign cmd_relevant = bus_valid & ~bus_nack & ~bus_hit &
                         ((bus_cmd == `CMD_BUSRD) | (bus_cmd == `CMD_BUSRDX)) &
                         ({bus_addr,4'b0} >= ROM_BASE) &
                         ({bus_addr,4'b0} < (ROM_BASE+ROM_SIZE));
+  /*verilator lint_on WIDTH*/
 
   wire [2:0] bus_cycle_n;
   assign bus_cycle_n = bus_cycle_r + 1;

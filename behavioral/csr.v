@@ -219,7 +219,7 @@ module csr(
   always @(*) begin
     // Passive updates
     {mcycleh_n, mcycle_n} = {mcycleh, mcycle} + 1;
-    {minstreth_n, minstret_n} = {minstreth, minstret} + (inc_minstret);
+    {minstreth_n, minstret_n} = {minstreth, minstret} + {63'b0,inc_minstret};
 
     // Active updates: CSR instructions (overrides passive)
     if(wen)
@@ -240,8 +240,8 @@ module csr(
 
   always @(posedge clk)
     if(wen & sel_muarttx) begin
-      muarttx <= wdata;
-      top.tb_uart_tx(wdata);
+      muarttx <= wdata[7:0];
+      top.tb_uart_tx(wdata[7:0]);
     end
 
 endmodule

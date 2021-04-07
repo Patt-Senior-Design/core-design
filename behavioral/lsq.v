@@ -55,7 +55,7 @@ module lsq(
   reg [15:0]  lq_issued;
   reg [15:0]  lq_complete;
   reg [15:0]  lq_error;
-  reg [15:0]  lq_ecause;
+  reg [4:0]   lq_ecause [0:15];
   reg [2:0]   lq_type [0:15];
   reg [6:0]   lq_robid [0:15];
   reg [4:0]   lq_rd [0:15];
@@ -159,25 +159,16 @@ module lsq(
   wire wb_beat;
   assign wb_beat = lsq_wb_valid & ~wb_lsq_stall;
 
-  integer lq_insert_idx;
-  always @(*)
-    lq_insert_idx = $clog2(lq_insert_sel);
+  /*verilator lint_off WIDTH*/
+  wire [3:0] lq_insert_idx, lq_addrgen_idx, lq_issue_idx, lq_remove_idx;
+  assign lq_insert_idx = $clog2(lq_insert_sel);
+  assign lq_addrgen_idx = $clog2(lq_addrgen_sel_r);
+  assign lq_issue_idx = $clog2(lq_issue_sel);
+  assign lq_remove_idx = $clog2(lq_remove_sel);
 
-  integer lq_addrgen_idx;
-  always @(*)
-    lq_addrgen_idx = $clog2(lq_addrgen_sel_r);
-
-  integer lq_issue_idx;
-  always @(*)
-    lq_issue_idx = $clog2(lq_issue_sel);
-
-  integer lq_remove_idx;
-  always @(*)
-    lq_remove_idx = $clog2(lq_remove_sel);
-
-  integer sq_addrgen_idx;
-  always @(*)
-    sq_addrgen_idx = $clog2(sq_addrgen_sel_r);
+  wire [3:0] sq_addrgen_idx;
+  assign sq_addrgen_idx = $clog2(sq_addrgen_sel_r);
+  /*verilator lint_on WIDTH*/
 
   // rename interface
   assign lsq_stall = ~rename_op[3] ? ~lq_insert_rdy : ~sq_insert_rdy;
@@ -187,7 +178,7 @@ module lsq(
   assign lsq_dc_op = lq_issue_req ? {lq_type[lq_issue_idx],1'b0} : {sq_type[sq_head],1'b1};
   assign lsq_dc_addr = lq_issue_req ? lq_addr[lq_issue_idx] : sq_addr[sq_head];
   assign lsq_dc_lsqid = lq_issue_idx;
-  assign lsq_dc_wdata = lq_issue_req ? lq_op2[lq_issue_idx] : sq_data[sq_head];
+  assign lsq_dc_wdata = lq_issue_req ? {24'b0,lq_op2[lq_issue_idx]} : sq_data[sq_head];
   assign lsq_dc_flush = rob_flush;
 
   // writeback interface (out)
@@ -195,7 +186,7 @@ module lsq(
   assign lsq_wb_error = lq_error[lq_remove_idx];
   assign lsq_wb_ecause = lq_ecause[lq_remove_idx];
   assign lsq_wb_robid = lq_robid[lq_remove_idx];
-  assign lsq_wb_rd = lq_rd[lq_remove_idx];
+  assign lsq_wb_rd = {1'b0,lq_rd[lq_remove_idx]};
   assign lsq_wb_result = lq_data[lq_remove_idx];
 
   priarb #(16) lq_insert_arb(

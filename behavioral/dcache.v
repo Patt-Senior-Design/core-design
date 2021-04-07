@@ -420,7 +420,7 @@ module dcache(
         s0_mshrhit ? oh2idx(mshr_way) : oh2idx(s0_taghits),
         s0_addr_r[5:3]};
       s1_wmask_r <= {4'b0,s0_wmask} << (s0_addr_r[2] * 4);
-      s1_wdata_r <= {4{s0_wdata_aligned}};
+      s1_wdata_r <= {2{s0_wdata_aligned}};
     end else if(fill_wen) begin
       s1_wen_r <= 1;
       s1_waddr_r <= fill_index;
@@ -483,6 +483,7 @@ module dcache(
     for(l = 0; l < 8; l=l+1)
       s2_bcmp_result[l] = s2_rdata_r[l*8+:8] == s2_op2_r;
 
+  /*verilator lint_off WIDTH*/
   // s2_rdata_*
   always @(*) begin
     s2_rdata_muxed = s2_rdata_r[s2_offset_r[2]*32+:32];
@@ -495,11 +496,12 @@ module dcache(
       3'b01?: // LW
         s2_rdata_extended = s2_rdata_aligned;
       3'b1?0: // LBU
-        s2_rdata_extended = s2_rdata_aligned[7:0];
+        s2_rdata_extended = {24'b0,s2_rdata_aligned[7:0]};
       3'b1?1: // LHU
-        s2_rdata_extended = s2_rdata_aligned[15:0];
+        s2_rdata_extended = {16'b0,s2_rdata_aligned[15:0]};
     endcase
   end
+  /*verilator lint_on WIDTH*/
 
   // tagmem write
   integer j;

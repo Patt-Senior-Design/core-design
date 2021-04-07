@@ -90,6 +90,8 @@ module l2 #(
   wire        l2trans_valid;
   // End of automatics
 
+  wire        invfifo_ready;
+
   assign l2_idle = l2tag_idle & l2data_idle & l2trans_idle;
 
   l2tag #(BUSID) l2tag(

@@ -25,8 +25,8 @@ module brpred(
   wire [13:0] arch_bhr_next, spec_bhr_next;
   wire [13:0] pht_rd_addr;
 
-  assign arch_bhr_next = {arch_bhr,rob_ret_bptaken};
-  assign spec_bhr_next = {spec_bhr,brpred_bptaken};
+  assign arch_bhr_next = {arch_bhr[12:0],rob_ret_bptaken};
+  assign spec_bhr_next = {spec_bhr[12:0],brpred_bptaken};
 
   // we must forward the bhr during consecutive branch predictions
   assign pht_rd_addr = (req_r ? spec_bhr_next : spec_bhr) ^ fetch_bp_addr[16:3];

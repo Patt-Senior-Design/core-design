@@ -65,6 +65,7 @@ module bfs_core (
   wire q_full, rq_empty;
   wire pend_empty;
   wire spill_req;
+  wire spill_done;
   wire spill_init;
   wire spill_op;
   wire [63:0] spill_data;
@@ -176,33 +177,39 @@ module bfs_core (
   end 
 
   always @(*) begin
-    casez(state)
-      IDLE: begin
-        enq_req = 2'b00;
-        next_neigh_ct = 4'b0;
-        next_state = (start ? INIT : IDLE);
-      end
+    enq_req = 0;
+    enq_data = 0;
+    next_neigh_ct = 0;
+    next_state = state;
+    case(state)
+      IDLE:
+        if(start)
+          next_state = INIT;
       INIT: begin
         // Queue init: Insert from_node
         enq_req = 2'b01;
         enq_data = {32'b0, from_node};
         // Next
-        next_neigh_ct = 4'b0;
         next_state = NODE_HEADER;
       end
       NODE_HEADER: begin
-        enq_req = 2'b00;
         // Next
         next_neigh_ct = rdata_neigh_ct;
-        next_state = (done ? IDLE : (init_add_neighs ? ADD_NEIGHS : NODE_HEADER));
+        if(done)
+          next_state = IDLE;
+        else if(init_add_neighs)
+          next_state = ADD_NEIGHS;
       end
       ADD_NEIGHS: begin
         enq_req = {|neigh_ct[3:1], 1'b1};
         enq_data = dc_rdata;
         // Next
-        next_neigh_ct[3:1] = neigh_ct[3:1] - 1;
-        next_state = (last_neigh_iter ? NODE_HEADER : ADD_NEIGHS);
+        next_neigh_ct = {neigh_ct[3:1] - 3'd1,neigh_ct[0]};
+        if(last_neigh_iter)
+          next_state = NODE_HEADER;
       end
+      default:
+        next_state = IDLE;
     endcase
   end
 
@@ -229,6 +236,7 @@ module bfs_core (
         REG_QBASE: sw_queue_base <= csr_bfs_wdata;
         REG_QSIZE: sw_queue_size <= csr_bfs_wdata;
         REG_RESULT: result <= csr_bfs_wdata;
+        default: ;
       endcase
 
 endmodule

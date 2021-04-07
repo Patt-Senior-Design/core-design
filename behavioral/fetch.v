@@ -52,6 +52,7 @@ module fetch(
   reg        jalr_halt_r;
   reg        misalign_err_r;
 
+  /*verilator lint_off WIDTH*/
   // br/jal target computation
   function [31:1] br_target(
     input [31:2] base,
@@ -64,6 +65,7 @@ module fetch(
     input [31:0] insn);
     jal_target = $signed({base,1'b0}) + $signed({insn[31],insn[19:12],insn[20],insn[30:21]});
   endfunction
+  /*verilator lint_on WIDTH*/
 
   // derived signals
   wire buf_empty, buf_full;

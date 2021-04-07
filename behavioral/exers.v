@@ -66,6 +66,7 @@ module exers #(
 
   wire resolve_valid = (wb_valid & (~wb_error) & (~wb_rd[5]));
 
+  /*verilator lint_off WIDTH*/
   // Find empty entry to insert into or ready entry to issue (priority encoder)
   // MSB tells you whether index is found or not
   function automatic [$clog2(RS_ENTRIES):0] find_idx 
@@ -80,6 +81,7 @@ module exers #(
       find_idx[$clog2(RS_ENTRIES)] = (bit_val ? (| vector) : (& vector));
     end
   endfunction
+  /*verilator lint_on WIDTH*/
 
   always @(posedge clk) begin
     // Issue latch

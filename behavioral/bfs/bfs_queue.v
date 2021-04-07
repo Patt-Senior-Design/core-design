@@ -129,39 +129,44 @@ module bfs_queue #(
     inq_enq_data = 0;
     next_qstate = qstate;
     next_ct = ct;
-    casez(qstate)
+    case(qstate)
       CORE: begin
         // FORWARDING
         outq_deq_req = ~inq_full & (outq_filled | single_final);
         inq_enq_req = outq_deq_req ? {~single_final, 1'b1} : 2'b00;
         inq_enq_data = outq_deq_data;
         // Spill only when inq full and outq saturated, restore when queues empty
-        casez({spill_cond, pend_empty})
-          2'b00: next_qstate = CORE;
-          2'b01: next_qstate = INIT_RESTORE;
-          2'b10: next_qstate = INIT_SPILL;
+        case(1)
+          spill_cond: next_qstate = INIT_SPILL;
+          pend_empty: next_qstate = INIT_RESTORE;
         endcase
       end
       INIT_SPILL: begin
         next_ct = 6;
         outq_deq_req = dc_ready;
-        next_qstate = (dc_ready ? SPILL : INIT_SPILL);
+        if(dc_ready)
+          next_qstate = SPILL;
       end
       INIT_RESTORE: begin
         next_ct = 7;
-        next_qstate = (dc_ready ? RESTORE : INIT_RESTORE);
+        if(dc_ready)
+          next_qstate = RESTORE;
       end
       RESTORE: begin
         next_ct = dc_valid ? (ct - 1) : ct;
         inq_enq_req = {2{dc_valid}};
         inq_enq_data = dc_rdata;
-        next_qstate = ((~dc_valid | (ct != 0)) ? RESTORE : CORE);
+        if(dc_valid & (ct == 0))
+          next_qstate = CORE;
       end
       SPILL: begin
         next_ct = dc_ready ? (ct - 1) : ct;
         outq_deq_req = dc_ready;
-        next_qstate = ((~dc_ready | (ct != 0)) ? SPILL : CORE);
+        if(dc_ready & (ct == 0))
+          next_qstate = CORE;
       end
+      default:
+        next_qstate = CORE;
     endcase
   end
 

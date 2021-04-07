@@ -220,7 +220,11 @@ module l2data(
   assign l2data_idle = ~s0_req_valid_r & ~s1_req_valid_r & ~s2_req_valid_r;
 
   // bank signals
-  always @(*)
+  always @(*) begin
+    bank_addr = 0;
+    bank_wen = 0;
+    bank_wmask = 0;
+    bank_wdata = 0;
     if(s0_snoop_issue) begin
       bank_in_valid = snoop_bank_sel;
       bank_addr = snoop_bank_addr;
@@ -235,6 +239,7 @@ module l2data(
       bank_wdata = s0_req_wdata_r;
     end else
       bank_in_valid = 0;
+  end
 
   genvar i;
   generate

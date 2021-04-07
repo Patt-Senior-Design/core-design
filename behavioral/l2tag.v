@@ -195,6 +195,7 @@ module l2tag #(
         4'b??01: fill_way = 4'b0010;
         4'b?011: fill_way = 4'b0100;
         4'b0111: fill_way = 4'b1000;
+        default: ; // 1111 not possible due to precondition
       endcase
     else
       // decode lru bits
@@ -277,7 +278,6 @@ module l2tag #(
 
   // l2reqfifo interface
   assign l2_req_ready = ~s0_req_stall;
-  assign l2_req_wdata_ready = l2_req_ready;
 
   // l2data interface
   assign l2tag_req_valid = (s1_req_valid_r & ~s1_req_stall) |
@@ -390,7 +390,7 @@ module l2tag #(
         s1_req_op_r <= s0_req_op_r;
         s1_req_addr_r <= s0_req_addr_r[31:3];
         s1_req_wmask_r <= s0_req_wmask_r;
-        s1_req_wdata_r <= {2{s0_req_wdata_r}};
+        s1_req_wdata_r <= s0_req_wdata_r;
       end
     end
 
@@ -595,6 +595,8 @@ module l2tag #(
             pend_valid_r <= 0;
           `CMD_FLUSH:
             // all done, will follow up with BusRd/BusRdX as appropriate
+            pend_valid_r <= 0;
+          default:
             pend_valid_r <= 0;
         endcase
 

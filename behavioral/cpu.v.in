@@ -6,13 +6,23 @@ module cpu(
 
   /*AUTOWIRE*/
 
+  wire        l2_l2fifo_ready;
+
+  wire        bfs_bus_req;
   wire [2:0]  bfs_bus_cmd;
   wire [4:0]  bfs_bus_tag;
   wire [31:6] bfs_bus_addr;
   wire [63:0] bfs_bus_data;
+  wire        bfs_bus_hit;
+  wire        bfs_bus_nack;
+
+  wire        dc_valid;
   wire [1:0]  dc_op;
   wire [31:6] dc_addr;
   wire [63:0] dc_rdata;
+
+  wire        dc_ready;
+  wire        dc_rbuf_empty;
 
   brpred brpred(
     /*AUTOINST*/);

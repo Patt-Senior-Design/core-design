@@ -26,12 +26,10 @@ module l2fifo(
   reg [31:0] req_wdata;
   always @(*) begin
     req_valid = dcache_l2fifo_req;
-    if(dcache_l2fifo_req) begin
-      req_addr = dcache_l2fifo_addr;
-      req_wen = dcache_l2fifo_wen;
-      req_wmask = dcache_l2fifo_wmask;
-      req_wdata = dcache_l2fifo_wdata;
-    end
+    req_addr = dcache_l2fifo_addr;
+    req_wen = dcache_l2fifo_wen;
+    req_wmask = dcache_l2fifo_wmask;
+    req_wdata = dcache_l2fifo_wdata;
   end
 
   // 30+1+4+32-1 = 67

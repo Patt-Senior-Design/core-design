@@ -242,6 +242,7 @@ module decode(
     endcase
   end
 
+  /*verilator lint_off WIDTH*/
   // immediate generator
   always @(*) begin
     imm = 0;
@@ -251,9 +252,9 @@ module decode(
       fmt_b: imm = $signed({insn[31],insn[7],insn[30:25],insn[11:8],1'b0});
       fmt_u: imm = {insn[31:12],12'b0};
       fmt_j: imm = $signed({insn[31],insn[19:12],insn[20],insn[30:21],1'b0});
-      default: imm = 0;
     endcase
   end
+  /*verilator lint_off WIDTH*/
 
   // rsop
   always @(*)

@@ -50,9 +50,11 @@ module dramctl(
 
   reg cmd_relevant, cmd_write;
   always @(*) begin
+    /*verilator lint_off WIDTH*/
     cmd_relevant = bus_valid & ~bus_nack & (~bus_hit | (bus_cmd == `CMD_FLUSH)) &
                    ({bus_addr,4'b0} >= RAM_BASE) &
                    ({bus_addr,4'b0} < (RAM_BASE+RAM_SIZE));
+    /*verilator lint_on WIDTH*/
     case(bus_cmd)
       `CMD_BUSRD: cmd_write = 0;
       `CMD_BUSRDX: cmd_write = 0;
@@ -72,18 +74,20 @@ module dramctl(
   always @(posedge clk)
     bus_wdata_r[bus_cycle_r*64+:64] <= bus_data;
 
+  /*verilator lint_off WIDTH*/
   // cycle 0 of rdata is handled below
   reg [64*8-1:0] dram_rdata_r;
   always @(posedge clk)
     if(bus_cycle_r != 7)
       dramctl_bus_data <= dram_rdata_r[(bus_cycle_r+1)*64+:64];
 
+  wire [31:2] mem_addr;
+  assign mem_addr = {bus_addr,4'b0} - RAM_BASE;
+  /*verilator lint_on WIDTH*/
+
   reg dramclk;
   initial
     `INIT;
-
-  wire [31:2] mem_addr;
-  assign mem_addr = {bus_addr,4'b0} - RAM_BASE;
 
   reg        dramsim_ready;
   reg        cmd_valid_r;
@@ -117,7 +121,9 @@ module dramctl(
       if(dramctl_bus_req & bus_dramctl_grant) begin
         `RESPDATA(resp_tag_r, resp_addr_r, dram_rdata_r);
         dramctl_bus_tag <= resp_tag_r;
+        /*verilator lint_off WIDTH*/
         dramctl_bus_addr <= (RAM_BASE/16) + resp_addr_r[31:6];
+        /*verilator lint_on WIDTH*/
         dramctl_bus_data <= dram_rdata_r[63:0];
       end
       // this cycle

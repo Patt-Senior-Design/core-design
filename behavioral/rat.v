@@ -115,7 +115,7 @@ module rat(
     else if(valid_rs1)
       rat_rs1_tagval = spec_val_rs1;
     else
-      rat_rs1_tagval = tag_rs1;
+      rat_rs1_tagval = {25'b0,tag_rs1};
 
     if(fwd_rs2)
       rat_rs2_tagval = wb_result;
@@ -126,7 +126,7 @@ module rat(
     else if(valid_rs2)
       rat_rs2_tagval = spec_val_rs2;
     else
-      rat_rs2_tagval = tag_rs2;
+      rat_rs2_tagval = {25'b0,tag_rs2};
   end
   
 endmodule
