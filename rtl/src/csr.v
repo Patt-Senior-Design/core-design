@@ -83,7 +83,7 @@ module csr(
 
   // UART
   wire sel_muarttx;
-  `FLOP_E (muarttx, 8, wen & sel_muarttx, wdata);
+  `FLOP_E (muarttx, 8, wen & sel_muarttx, wdata[7:0]);
 
 
   // Stage latches
@@ -181,7 +181,7 @@ module csr(
   always @(posedge clk)
     if(wen & sel_muarttx) begin
       //muarttx <= wdata;
-      top.tb_uart_tx(wdata);
+      top.tb_uart_tx(wdata[7:0]);
     end
 
 endmodule
