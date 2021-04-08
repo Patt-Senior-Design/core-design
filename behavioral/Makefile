@@ -9,13 +9,20 @@ SIMOPTS += +vpi -CFLAGS "-I$(DRAMSIM)/DRAMsim3/src"
 SIMOPTS += -LDLFLAGS "-L$(DRAMSIM)/DRAMsim3 -Wl,--push-state,--no-as-needed,--whole-archive -l:libdramsim3.a -Wl,--pop-state"
 SIMOPTS += -P $(DRAMSIM)/pli.tab
 SIMOPTS += -o build/top
+
+build/top: $(SRCS) build/cpu.v $(DRAMSIM)/DRAMsim3/libdramsim3.a
+	$(SIM) $(SIMOPTS) $(SRCS) build/cpu.v
 else ifeq ($(SIM),verilator)
 SRCS += $(shell pwd)/top.cc $(DRAMSIM)/dramsim_verilator.cc
-SIMOPTS := --cc --exe --build -j 4 --Mdir build --top top
+SIMOPTS := --cc --exe --Mdir build --top top
 SIMOPTS += -CFLAGS "-I$(DRAMSIM) -I$(DRAMSIM)/DRAMsim3/src -march=native"
 SIMOPTS += -LDFLAGS "-L$(DRAMSIM)/DRAMsim3 -Wl,--push-state,--no-as-needed,--whole-archive -l:libdramsim3.a -Wl,--pop-state"
 SIMOPTS += --trace-fst --trace-threads 1 --trace-max-array 128
 SIMOPTS += -o top
+
+build/top: $(SRCS) build/cpu.v $(DRAMSIM)/DRAMsim3/libdramsim3.a
+	$(SIM) $(SIMOPTS) $(SRCS) build/cpu.v
+	$(MAKE) -C build -f Vtop.mk OPT_SLOW=-O2 OPT_FAST=-O3 OPT_GLOBAL=-O3
 else
 $(error Unknown simulator $(SIM))
 endif
@@ -23,9 +30,6 @@ endif
 .PHONY: all clean
 
 all: build/top
-
-build/top: $(SRCS) build/cpu.v $(DRAMSIM)/DRAMsim3/libdramsim3.a
-	$(SIM) $(SIMOPTS) $(SRCS) build/cpu.v
 
 build/%.v: $(SRCS) %.v.in | build
 	./auto.sh $*.v
