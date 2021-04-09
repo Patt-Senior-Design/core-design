@@ -91,15 +91,16 @@ module csr(
   always @(posedge clk)
     if(rst)
       valid <= 0;
-    else if(~csr_stall) begin
+    else if(~csr_stall)
       valid <= rename_csr_write;
-      if(rename_csr_write) begin
-        op <= rename_op[2:0];
-        rd <= rename_rd;
-        op1 <= rename_op1;
-        robid <= rename_robid;
-        addr <= rename_imm[11:0];
-      end
+
+  always @(posedge clk)
+    if(~csr_stall & rename_csr_write) begin
+      op <= rename_op[2:0];
+      rd <= rename_rd;
+      op1 <= rename_op1;
+      robid <= rename_robid;
+      addr <= rename_imm[11:0];
     end
 
   // address decoder
@@ -197,6 +198,7 @@ module csr(
   assign csr_error = sel_none | wr_error |
                      (bfs_req_r & (~bfs_csr_valid | bfs_csr_error));
   assign csr_ecause = 0; // TODO
+  assign csr_tvec = 0;
 
   // CSR latching
   always @(posedge clk) begin
@@ -214,7 +216,7 @@ module csr(
   end
 
   wire inc_minstret;
-  assign inc_minstret = rob_ret_valid & ~(rob_ret_csr & (addr === MINSTRET));
+  assign inc_minstret = rob_ret_valid & ~(rob_ret_csr & (addr == MINSTRET));
   // Update CSR logic
   always @(*) begin
     // Passive updates
@@ -232,6 +234,13 @@ module csr(
   end
 
   always @(posedge clk)
+    if(rst)
+      muarttx <= 0;
+    else if(wen & sel_muarttx)
+      muarttx <= wdata[7:0];
+
+`ifndef SYNTHESIS
+  always @(posedge clk)
     if(valid & ~csr_error & wen)
       top.tb_trace_csr_write(
         robid,
@@ -239,9 +248,8 @@ module csr(
         wdata);
 
   always @(posedge clk)
-    if(wen & sel_muarttx) begin
-      muarttx <= wdata[7:0];
+    if(wen & sel_muarttx)
       top.tb_uart_tx(wdata[7:0]);
-    end
+`endif
 
 endmodule

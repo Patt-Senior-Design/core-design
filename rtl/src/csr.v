@@ -150,11 +150,12 @@ module csr(
   assign csr_error = sel_none | wr_error |
                      (bfs_req_r & (~bfs_csr_valid | bfs_csr_error));
   assign csr_ecause = 0; // TODO
+  assign csr_tvec = 0;
 
 
   /* Update CSR logic */
   wire inc_minstret;
-  assign inc_minstret = rob_ret_valid & ~(rob_ret_csr & (addr === MINSTRET));
+  assign inc_minstret = rob_ret_valid & ~(rob_ret_csr & (addr == MINSTRET));
 
   wire [63:0] mcycle64_n;
   wire [63:0] minstret64_n;
@@ -170,6 +171,7 @@ module csr(
 
   // =====
 
+`ifndef SYNTHESIS
   /* TRACE */
   always @(posedge clk)
     if(valid & ~csr_error & wen)
@@ -183,5 +185,6 @@ module csr(
       //muarttx <= wdata;
       top.tb_uart_tx(wdata[7:0]);
     end
+`endif
 
 endmodule
