@@ -1,12 +1,13 @@
 module encoder #(
   parameter BITS = 1
   )(
-  input  [BITS-1:0]      in,
-  output invalid,
+  input [BITS-1:0]          in,
+  output                    invalid,
   output [$clog2(BITS)-1:0] out);
 
   assign invalid = ~|in;
 
+  /*verilator lint_off WIDTH*/
   wire [(BITS>>1)-1:0] encode_bits [$clog2(BITS)-1:0];
   genvar i;
   genvar k;
@@ -23,6 +24,6 @@ module encoder #(
       assign out[i] = |encode_bits[i];
     end
   endgenerate
-
+  /*verilator lint_on WIDTH*/
 
 endmodule
