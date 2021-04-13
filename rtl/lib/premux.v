@@ -12,8 +12,9 @@ module premux #(
 
   genvar i;
   generate
-    for(i = 0; i < N; i=i+1)
+    for(i = 0; i < N; i=i+1) begin : premux_gen
       assign steps[i+1] = steps[i] | ({W{sel[i]}} & in[i*W+:W]);
+    end
   endgenerate
   /*verilator lint_on UNOPTFLAT*/
 
