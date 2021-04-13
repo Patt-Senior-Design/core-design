@@ -65,9 +65,12 @@ module csr(
     MUARTSTAT_TXEMPTY = 32'h00000004,
     MUARTSTAT_TXFULL  = 32'h00000008;
 
-
-  wire [31:0] wdata;
-  wire wen;
+  // Supported CSRs
+  wire [31:0] mcycle; 
+  wire [31:0] mcycleh;
+  wire [31:0] minstret;
+  wire [31:0] minstreth;
+  wire [7:0] muarttx;
 
   // Updated CSR value
   wire [31:0] mcycle_n; 
@@ -75,26 +78,31 @@ module csr(
   wire [31:0] minstret_n;
   wire [31:0] minstreth_n;
 
-  // Supported CSRs/latching
-  `FLOP (mcycle, 32, mcycle_n);
-  `FLOP (mcycleh, 32, mcycleh_n);
-  `FLOP (minstret, 32, minstret_n);
-  `FLOP (minstreth, 32, minstreth_n);
-
-  // UART
-  wire sel_muarttx;
-  `FLOP_E (muarttx, 8, wen & sel_muarttx, wdata[7:0]);
 
 
   // Stage latches
+  wire valid;
+  flop #(1) valid_flop (.clk(clk), .set(1'b0), .rst(rst), .enable(~csr_stall),
+      .d(rename_csr_write), .q(valid));
+
+  wire [2:0] op;
+  wire [6:0] robid;
+  wire [5:0] rd;
+  wire [31:0] op1;
+  wire [11:0] addr;
   wire stage_en = ~csr_stall & rename_csr_write;
-  `FLOP_E   (valid, 1, ~csr_stall, rename_csr_write);
-  `FLOP_NRE (op, 3, stage_en, rename_op[2:0]);
-  `FLOP_NRE (rd, 6, stage_en, rename_rd);
-  `FLOP_NRE (op1, 32, stage_en, rename_op1);
-  `FLOP_NRE (robid, 7, stage_en, rename_robid);
-  `FLOP_NRE (addr, 12, stage_en, rename_imm[11:0]);
-  
+
+  flop #(3) op_flop (.clk(clk), .set(1'b0), .rst(1'b0), .enable(stage_en),
+      .d(rename_op[2:0]), .q(op));
+  flop #(7) robid_flop (.clk(clk), .set(1'b0), .rst(1'b0), .enable(stage_en),
+      .d(rename_robid), .q(robid));
+  flop #(6) rd_flop (.clk(clk), .set(1'b0), .rst(1'b0), .enable(stage_en),
+      .d(rename_rd), .q(rd));
+  flop #(32) op1_flop (.clk(clk), .set(1'b0), .rst(1'b0), .enable(stage_en),
+      .d(rename_op1), .q(op1));
+  flop #(12) addr_flop (.clk(clk), .set(1'b0), .rst(1'b0), .enable(stage_en),
+      .d(rename_imm[11:0]), .q(addr));
+
   assign csr_valid = valid & ~csr_stall;
   assign csr_robid = robid;
   assign csr_rd = rd;
@@ -106,39 +114,43 @@ module csr(
   wire sel_minstreth  = ~|(addr ^ MINSTRETH);
   wire sel_muartstat  = ~|(addr ^ MUARTSTAT);
   wire sel_muartrx    = ~|(addr ^ MUARTRX);
-  assign sel_muarttx    = ~|(addr ^ MUARTTX);
+  wire sel_muarttx    = ~|(addr ^ MUARTTX);
   wire sel_bfs       = ~|(addr[11:4] ^ 8'h7D);
   wire sel_ml2stat    = ~|(addr ^ ML2STAT);
   wire sel_none = ~(sel_mcycle | sel_mcycleh | sel_minstret | sel_minstreth |
       sel_muartstat | sel_muartrx | sel_muarttx | sel_bfs | sel_ml2stat);
 
   // read-data mux
-  wire [31:0] sel_mcycle_out     = (mcycle & {32{sel_mcycle}});
-  wire [31:0] sel_mcycleh_out    = (mcycleh & {32{sel_mcycleh}});
-  wire [31:0] sel_minstret_out   = (minstret & {32{sel_minstret}});
-  wire [31:0] sel_minstreth_out  = (minstreth & {32{sel_minstreth}});
-  wire [31:0] sel_muartstat_out  = ((MUARTSTAT_TXEMPTY | MUARTSTAT_RXEMPTY) & {32{sel_muartstat}});
-  //wire [31:0] sel_muartrx_out    = (mcycle & {32{sel_muartrx}});
-  wire [31:0] sel_muarttx_out    = ({24'b0,muarttx} & {32{sel_muarttx}});
-  wire [31:0] sel_bfs_out       = (bfs_csr_rdata & {32{sel_bfs}});
-  wire [31:0] sel_ml2stat_out    = ({31'b0,l2fifo_l2_req} & {32{sel_ml2stat}});
+  premux #(32, 8) csr_result_mux (
+      .sel ({sel_mcycle, sel_mcycleh, sel_minstret, sel_minstreth, sel_muartstat, 
+             sel_muarttx, sel_bfs, sel_ml2stat}),
+      .in  ({mcycle, mcycleh, minstret, minstreth, (MUARTSTAT_TXEMPTY | MUARTSTAT_RXEMPTY), 
+            {24'b0, muarttx}, bfs_csr_rdata, {31'b0,l2fifo_l2_req}}),
+      .out (csr_result)
+  );
 
-  assign csr_result = (sel_mcycle_out | sel_mcycleh_out | sel_minstret_out | sel_minstreth_out |
-      sel_muartstat_out | sel_muarttx_out | sel_bfs_out | sel_ml2stat_out);
 
   // write data mux
-  assign wen    = |op[1:0] & valid;
+  wire wen    = |op[1:0] & valid;
   wire csr_ro   = &addr[11:10];
   wire wr_error = |op[1:0] & csr_ro;
-  `MUX4X1 (wdata, 32, op[1:0], 
-          0, op1, csr_result|op1, csr_result&~op1)
+
+  wire [31:0] wdata;
+  mux #(32, 4) wdata_mux (
+      .sel(op[1:0]),
+      .in({csr_result&~op1, csr_result|op1, op1, 32'b0}),
+      .out(wdata));
 
   // set bfs req
-  `FLOP (bfs_req_r, 1, csr_bfs_valid);
+  wire bfs_req_r;
+  flop #(1) bfs_req_r_flop (.clk(clk), .set(1'b0), .rst(rst), .enable(1'b1),
+      .d(csr_bfs_valid), .q(bfs_req_r));
 
   // l2 fifo
   wire l2fifo_stall = wen & sel_ml2stat & l2fifo_l2_req;
-  `FLOP_RS (l2fifo_stall_r, 1, rst|~l2fifo_l2_req, wen&sel_ml2stat);
+  wire l2fifo_stall_r;
+  flop #(1) l2fifo_stall_r_flop (.clk(clk), .set(wen&sel_ml2stat), .rst(rst|~l2fifo_l2_req), .enable(1'b0),
+      .d(1'b0), .q(l2fifo_stall_r));
 
   // csrrs/c not supported
   assign csr_bfs_valid = valid & ~op[1] & sel_bfs & ~bfs_req_r;
@@ -152,24 +164,50 @@ module csr(
   assign csr_ecause = 0; // TODO
   assign csr_tvec = 0;
 
+  // CSR latching
+  flop #(32) mcycle_flop (.clk(clk), .set(1'b0), .rst(rst), .enable(1'b1), 
+      .d(mcycle_n), .q(mcycle));
+  flop #(32) mcycleh_flop (.clk(clk), .set(1'b0), .rst(rst), .enable(1'b1),
+      .d(mcycleh_n), .q(mcycleh));
+  flop #(32) minstret_flop (.clk (clk), .set(1'b0), .rst(rst), .enable(1'b1),
+      .d(minstret_n), .q(minstret));
+  flop #(32) minstreth_flop (.clk(clk), .set(1'b0), .rst(rst), .enable(1'b1),
+      .d(minstreth_n), .q(minstreth));
 
   /* Update CSR logic */
-  wire inc_minstret;
-  assign inc_minstret = rob_ret_valid & ~(rob_ret_csr & (addr == MINSTRET));
+  wire inc_minstret = rob_ret_valid & ~(rob_ret_csr & (addr == MINSTRET));
 
-  wire [63:0] mcycle64_n;
-  wire [63:0] minstret64_n;
   // Passive csr update
+  wire [63:0] mcycle64_n;
   `ADD (64, mcycle64_n, {mcycleh, mcycle}, 64'b1);
+
+  wire [63:0] minstret64_n;
   `ADD (64, minstret64_n, {minstreth, minstret}, {63'b0, inc_minstret});
 
   // Next CSR: Passive:0, Active:1
-  `MUX2X1 (mcycle_n,    32, sel_mcycle & wen    , mcycle64_n[31:0]    , wdata);
-  `MUX2X1 (mcycleh_n,   32, sel_mcycleh & wen   , mcycle64_n[63:32]   , wdata);
-  `MUX2X1 (minstret_n,  32, sel_minstret & wen  , minstret64_n[31:0]  , wdata);
-  `MUX2X1 (minstreth_n, 32, sel_minstreth & wen , minstret64_n[63:32] , wdata);
+   mux #(32, 2) mcycle_n_mux (
+       .sel(sel_mcycle & wen),
+       .in({wdata, mcycle64_n[31:0]}),
+       .out(mcycle_n));
 
-  // =====
+   mux #(32, 2) mcycleh_n_mux (
+       .sel(sel_mcycleh & wen),
+       .in ({wdata, mcycle64_n[63:32]}),
+       .out (mcycleh_n));
+
+   mux #(32, 2) minstret_n_mux (
+       .sel(sel_minstret & wen),
+       .in ({wdata, minstret64_n[31:0]}),
+       .out (minstret_n));
+    
+   mux #(32, 2) minstreth_n_mux (
+       .sel(sel_minstreth & wen),
+       .in ({wdata, minstret64_n[63:32]}),
+       .out (minstreth_n));
+
+  // UART
+  flop #(8) muarttx_flop (.clk(clk), .set(1'b0), .rst(rst), .enable(wen & sel_muarttx),
+      .d(wdata[7:0]), .q(muarttx));
 
 `ifndef SYNTHESIS
   /* TRACE */
@@ -182,7 +220,6 @@ module csr(
 
   always @(posedge clk)
     if(wen & sel_muarttx) begin
-      //muarttx <= wdata;
       top.tb_uart_tx(wdata[7:0]);
     end
 `endif
