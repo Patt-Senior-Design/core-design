@@ -17,6 +17,17 @@
         .d (``SIG_IN``), \
         .q (``SIG_OUT``));
 
+`define FLOP_R(SIG_OUT, WIDTH, RST) \
+    \
+    wire [``WIDTH-1``:0] ``SIG_OUT``; \
+    flop #(.width(``WIDTH``)) ``SIG_OUT``_flop ( \
+        .clk (clk), \
+        .set (1'b0), \
+        .rst (``RST``), \
+        .enable (1'b0), \
+        .d (``WIDTH``'b0), \
+        .q (``SIG_OUT``));
+
 `define FLOP_RS(SIG_OUT, WIDTH, RST, SET) \
     \
     wire [``WIDTH-1``:0] ``SIG_OUT``; \
@@ -46,6 +57,17 @@
         .clk (clk), \
         .set (1'b0), \
         .rst (1'b0), \
+        .enable (``SIG_EN``), \
+        .d (``SIG_IN``), \
+        .q (``SIG_OUT``));
+
+`define FLOP_ER(SIG_OUT, WIDTH, SIG_EN, SIG_IN, RST) \
+    \
+    wire [``WIDTH-1``:0] ``SIG_OUT``; \
+    flop #(.width(``WIDTH``)) ``SIG_OUT``_flop ( \
+        .clk (clk), \
+        .set (1'b0), \
+        .rst (``RST``), \
         .enable (``SIG_EN``), \
         .d (``SIG_IN``), \
         .q (``SIG_OUT``));
@@ -99,5 +121,11 @@
         .a (``SIG_OP1``), \
         .b (``SIG_OP2``), \
         .c (``SIG_OUT``)); \
+
+`define INC(WIDTH, SIG_OUT, IN) \
+    \
+    inc #(.W(``WIDTH``)) ``SIG_OUT``_adder ( \
+        .in (``IN``), \
+        .out (``OUT``)); \
 
 

@@ -159,7 +159,7 @@ module csr(
   wire [63:0] mcycle64_n;
   wire [63:0] minstret64_n;
   // Passive csr update
-  `ADD (64, mcycle64_n, {mcycleh, mcycle}, 64'b1);
+  `INC (64, mcycle64_n, {mcycleh, mcycle});
   `ADD (64, minstret64_n, {minstreth, minstret}, {63'b0, inc_minstret});
 
   // Next CSR: Passive:0, Active:1
