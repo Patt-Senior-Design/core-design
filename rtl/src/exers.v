@@ -47,10 +47,8 @@ module exers #(
   input         rob_flush);
 
   genvar i;
-  wire[$clog2(RS_ENTRIES)-1:0] issue_idx;
   wire issue_valid;
   wire issue_stall;
-  wire [$clog2(RS_ENTRIES)-1:0] insert_idx;
   wire rs_full;
 
   wire resolve_valid = (wb_valid & (~wb_error) & (~wb_rd[5]));
@@ -68,8 +66,6 @@ module exers #(
   // One-hot insertion/issue vectors
   wire [RS_ENTRIES-1:0] issue_ohidx; // Assert issue_idx
   wire [RS_ENTRIES-1:0] insert_ohidx; // Assert insert_idx
-  decoder #($clog2(RS_ENTRIES)) iss_dec (.in(issue_idx), .out(issue_ohidx));
-  decoder #($clog2(RS_ENTRIES)) ins_dec (.in(insert_idx), .out(insert_ohidx));
   
   // Rst and set vectors for rs
   wire [RS_ENTRIES-1:0] rst_vec = ({RS_ENTRIES{rst|rob_flush}}) | ({RS_ENTRIES{issue_valid&~issue_stall}} & issue_ohidx);
@@ -127,10 +123,10 @@ module exers #(
   wire issue_invalid;
   wire [RS_ENTRIES-1:0] issue_ready = rs_valid & rs_op1ready & rs_op2ready;
   
-  priencoder #(RS_ENTRIES, 1) issue_rs_prippf (
+  privector #(RS_ENTRIES, 1) issue_rs_prippf (
     .in(issue_ready),
     .invalid(issue_invalid),
-    .out(issue_idx));
+    .out(issue_ohidx));
   assign issue_valid = ~issue_invalid;
 
   // Functional Issue Unit Arbitration 
@@ -146,18 +142,18 @@ module exers #(
     exers_mcalu1_issue, exers_mcalu0_issue} = issue_vec & {4{issue_valid}};
 
   // Insert logic
-  priencoder #(RS_ENTRIES, 0) insert_rs_prippf (
+  privector #(RS_ENTRIES, 0) insert_rs_prippf (
     .in(rs_valid),
     .invalid(rs_full),
-    .out(insert_idx));
+    .out(insert_ohidx));
 
   // Outputs to issue
-  assign exers_robid = rs_robid[(7*issue_idx) +: 7];
-  assign exers_rd = rs_rd[(6*issue_idx) +: 6];
-  assign exers_op1 = rs_op1[(32*issue_idx) +: 32];
-  assign exers_op2 = rs_op2[(32*issue_idx) +: 32];
-  assign exers_mcalu_op = rs_op[(5*issue_idx) +: 5];
-  assign exers_scalu_op = rs_op[(5*issue_idx) +: 5];
+  premux #(7, 32) exers_robid_mux (.sel(issue_ohidx), .in(rs_robid), .out(exers_robid));
+  premux #(6, 32) exers_rd_mux (.sel(issue_ohidx), .in(rs_rd), .out(exers_rd));
+  premux #(32, 32) exers_op1_mux (.sel(issue_ohidx), .in(rs_op1), .out(exers_op1));
+  premux #(32, 32) exers_op2_mux (.sel(issue_ohidx), .in(rs_op2), .out(exers_op2));
+  premux #(5, 32) exers_mcalu_op_mux (.sel(issue_ohidx), .in(rs_op), .out(exers_mcalu_op));
+  assign exers_scalu_op = exers_mcalu_op;
   assign exers_stall = rs_full;
 
 endmodule
