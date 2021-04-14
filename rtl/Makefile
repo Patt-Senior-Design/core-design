@@ -4,7 +4,7 @@ SRCS := $(wildcard lib/*.v) $(wildcard src/*.v) src/bfs/bfs_core.v src/bfs/bfs_q
 
 ifeq ($(SIM),vcs)
 SRCS += $(DRAMSIM)/dramsim_vpi.cc
-SIMOPTS := -full64 +v2k +warn=all +race=all -timescale=1ns/1ps -top top
+SIMOPTS := -full64 -v2005 +warn=all +race=all -timescale=1ns/1ps -top top
 SIMOPTS += +vpi -CFLAGS "-I$(DRAMSIM)/DRAMsim3/src"
 SIMOPTS += -LDLFLAGS "-L$(DRAMSIM)/DRAMsim3 -Wl,--push-state,--no-as-needed,--whole-archive -l:libdramsim3.a -Wl,--pop-state"
 SIMOPTS += -P $(DRAMSIM)/pli.tab

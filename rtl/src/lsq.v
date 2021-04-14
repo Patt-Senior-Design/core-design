@@ -67,23 +67,21 @@ module lsq(
   wire [(8*16)-1:0]  lq_op2;
 
   wire        lq_insert_rdy;
+  wire        lq_insert_beat;
   wire [15:0] lq_insert_sel;
-
-  // addrgen combinational input
-  wire        lq_addrgen_req_in;
-  wire [15:0] lq_addrgen_sel_in;
-  // addrgen registered output
-  wire        lq_addrgen_req;
-  wire [15:0] lq_addrgen_sel;
-  // addrgen combinational output
-  wire [31:0] lq_addrgen_addr;
+  wire [15:0] lq_insert_en;
 
   wire        lq_issue_rdy;
-  wire [15:0] lq_issue_sel, lq_sq_sel;
+  wire        lq_issue_req;
+  wire        lq_issue_beat;
+  wire [15:0] lq_issue_sel;
+  wire [15:0] lq_issue_en;
 
   wire        lq_remove_rdy;
   wire [15:0] lq_remove_sel;
+  wire [15:0] lq_remove_en;
 
+  wire [15:0] lq_sq_sel;
   wire        lq_sq_hit;
 
   // store queue
@@ -104,14 +102,13 @@ module lsq(
   wire [15:0] sq_head, sq_mid, sq_tail;
   wire        sq_head_pol, sq_mid_pol, sq_tail_pol;
 
-  // addrgen combinational input
-  wire        sq_addrgen_req_in;
-  wire [15:0] sq_addrgen_sel_in;
-  // addrgen registered output
-  wire        sq_addrgen_req;
-  wire [15:0] sq_addrgen_sel;
-  // addrgen combinational output
-  wire [31:0] sq_addrgen_addr;
+  wire        sq_insert_beat;
+  wire [15:0] sq_insert_en;
+
+  wire [15:0] sq_issue_req;
+  wire        sq_issue_ack;
+  wire [15:0] sq_issue_en;
+  wire        sq_issue_beat;
 
   // derived signals
   wire rst_flush = rst | rob_flush;
@@ -163,13 +160,14 @@ module lsq(
   premux #(32,16) lq_data_mux(lq_remove_sel, lq_data, lsq_wb_result);
 
   // ------------------------------------------------------------------load queue
-  wire        lq_insert_beat = rename_lsq_write & ~rename_op[3] & lq_insert_rdy;
-  wire [15:0] lq_insert_en = {16{lq_insert_beat}} & lq_insert_sel;
+  assign lq_insert_beat = rename_lsq_write & ~rename_op[3] & lq_insert_rdy;
+  assign lq_insert_en = {16{lq_insert_beat}} & lq_insert_sel;
 
-  wire        lq_issue_req = lq_issue_rdy & ~lq_sq_hit & ~rob_flush;
-  wire        lq_issue_beat = lq_issue_req & dcache_lsq_ready;
+  assign lq_issue_req = lq_issue_rdy & ~lq_sq_hit & ~rob_flush;
+  assign lq_issue_beat = lq_issue_req & dcache_lsq_ready;
+  assign lq_issue_en = {16{lq_issue_beat}} & lq_issue_sel;
 
-  wire [15:0] lq_remove_en = {16{wb_beat}} & lq_remove_sel;
+  assign lq_remove_en = {16{wb_beat}} & lq_remove_sel;
 
   priarb #(16) lq_insert_arb(
     .req(~lq_valid),
@@ -349,8 +347,6 @@ module lsq(
     .q(lq_addr_rdy));
 
   // lq_issued
-  wire [15:0] lq_issue_en = lq_issue_sel & {16{lq_issue_beat}};
-
   flop lq_issued_r[15:0](
     .clk(clk),
     .rst(lq_insert_en),
@@ -428,8 +424,8 @@ module lsq(
   wire [15:0] lq_sq_addr_hit_hi, lq_sq_addr_hit_lo;
   generate
     for(i = 0; i < 16; i=i+1) begin
-      assign lq_sq_addr_hit_hi[i] = ~|(sq_addr[i*32+:32][31:5] ^ lq_sq_addr[31:5]);
-      assign lq_sq_addr_hit_lo[i] = ~|(sq_addr[i*32+:32][4:2] ^ lq_sq_addr[4:2]);
+      assign lq_sq_addr_hit_hi[i] = ~|(sq_addr[(i*32)+31:(i*32)+5] ^ lq_sq_addr[31:5]);
+      assign lq_sq_addr_hit_lo[i] = ~|(sq_addr[(i*32)+4:(i*32)+2] ^ lq_sq_addr[4:2]);
     end
   endgenerate
 
@@ -443,14 +439,14 @@ module lsq(
   assign lq_sq_hit = |lq_sq_hits;
 
   // -----------------------------------------------------------------store queue
-  wire        sq_insert_beat = rename_lsq_write & rename_op[3] & ~sq_full;
-  wire [15:0] sq_insert_en = {16{sq_insert_beat}} & sq_tail;
+  assign sq_insert_beat = rename_lsq_write & rename_op[3] & ~sq_full;
+  assign sq_insert_en = {16{sq_insert_beat}} & sq_tail;
 
-  wire [15:0] sq_issue_req = sq_head & sq_valid & sq_addr_rdy &
-                             sq_issue_rdy & ~{16{rob_flush}};
-  wire        sq_issue_ack = ~lq_issue_req & dcache_lsq_ready;
-  wire [15:0] sq_issue_en = sq_issue_req & {16{sq_issue_ack}};
-  wire        sq_issue_beat = |sq_issue_en;
+  assign sq_issue_req = sq_head & sq_valid & sq_addr_rdy &
+                        sq_issue_rdy & ~{16{rob_flush}};
+  assign sq_issue_ack = ~lq_issue_req & dcache_lsq_ready;
+  assign sq_issue_en = sq_issue_req & {16{sq_issue_ack}};
+  assign sq_issue_beat = |sq_issue_en;
 
   // sq_head
   onehot #(16) sq_head_r(

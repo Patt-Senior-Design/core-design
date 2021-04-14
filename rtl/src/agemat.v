@@ -29,6 +29,8 @@ module agemat #(
             .enable(1'b0),
             .d(1'b0),
             .q(matrix[col][row]));
+        else
+          assign matrix[col][row] = 0;
   endgenerate
 
   /*verilator lint_off UNOPTFLAT*/

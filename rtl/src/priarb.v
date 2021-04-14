@@ -2,9 +2,9 @@
 module priarb #(
   parameter WIDTH = 16
   )(
-  input [WIDTH-1:0]      req,
-  output reg             grant_valid,
-  output reg [WIDTH-1:0] grant);
+  input [WIDTH-1:0]  req,
+  output             grant_valid,
+  output [WIDTH-1:0] grant);
 
   /*verilator lint_off UNOPTFLAT*/
   wire [WIDTH-1:0] therm;
