@@ -46,17 +46,7 @@ module exers #(
   // rob interface
   input         rob_flush);
 
-  integer i;
-  reg [RS_ENTRIES-1:0] rs_valid;
-  reg [4:0]            rs_op[RS_ENTRIES-1:0];
-  reg [5:0]            rs_rd[RS_ENTRIES-1:0];
-  reg [6:0]            rs_robid[RS_ENTRIES-1:0];
-
-  reg [RS_ENTRIES-1:0] rs_op1ready;
-  reg [31:0]           rs_op1[RS_ENTRIES-1:0];
-  reg [RS_ENTRIES-1:0] rs_op2ready;
-  reg [31:0]           rs_op2[RS_ENTRIES-1:0];
-
+  genvar i;
   wire[$clog2(RS_ENTRIES)-1:0] issue_idx;
   wire issue_valid;
   wire issue_stall;
@@ -65,84 +55,73 @@ module exers #(
 
   wire resolve_valid = (wb_valid & (~wb_error) & (~wb_rd[5]));
   
-  /*wire [RS_ENTRIES-1:0] rs_valid;
-  wire [4:0]            rs_op[RS_ENTRIES-1:0];
-  wire [5:0]            rs_rd[RS_ENTRIES-1:0];
-  wire [6:0]            rs_robid[RS_ENTRIES-1:0];
+  wire [RS_ENTRIES-1:0] rs_valid;
+  wire [(RS_ENTRIES*5)-1:0] rs_op;
+  wire [(RS_ENTRIES*6)-1:0] rs_rd;
+  wire [(RS_ENTRIES*7)-1:0] rs_robid;
 
   wire [RS_ENTRIES-1:0] rs_op1ready;
-  wire [31:0]           rs_op1[RS_ENTRIES-1:0];
+  wire [(RS_ENTRIES*32)-1:0] rs_op1;
   wire [RS_ENTRIES-1:0] rs_op2ready;
-  wire [31:0]           rs_op2[RS_ENTRIES-1:0];*/
+  wire [(RS_ENTRIES*32)-1:0] rs_op2;
   
   // One-hot insertion/issue vectors
-  wire [RS_ENTRIES-1:0] insert_rs; // Assert insert_idx
-  wire [RS_ENTRIES-1:0] issue_rs; // Assert issue_idx
+  wire [RS_ENTRIES-1:0] issue_ohidx; // Assert issue_idx
+  wire [RS_ENTRIES-1:0] insert_ohidx; // Assert insert_idx
+  decoder #($clog2(RS_ENTRIES)) iss_dec (.in(issue_idx), .out(issue_ohidx));
+  decoder #($clog2(RS_ENTRIES)) ins_dec (.in(insert_idx), .out(insert_ohidx));
+  
+  // Rst and set vectors for rs
+  wire [RS_ENTRIES-1:0] rst_vec = ({RS_ENTRIES{rst|rob_flush}}) | ({RS_ENTRIES{issue_valid&~issue_stall}} & issue_ohidx);
+  wire [RS_ENTRIES-1:0] insert_rs = {RS_ENTRIES{rename_exers_write&~exers_stall&~(rst|rob_flush)}} & insert_ohidx;
   // Associative Resolution vectors
   wire [RS_ENTRIES-1:0] resolve_rsop1; 
   wire [RS_ENTRIES-1:0] resolve_rsop2;
 
-  // Generate inputs/outputs for each RS entry
-  /*genvar i;
   generate
-    for (i = 0; i < RS_ENTRIES; i = i+1) begin
-      `FLOP2_RS (rs_valid[i], 1, 
-          rst|rob_flush|issue_rs[i], insert_rs[i]);
-
-      `FLOP2_E (rs_op[i], 5, insert_rs[i], rename_op);
-      `FLOP2_E (rs_rd[i], 6, insert_rs[i], rename_rd);
-      `FLOP2_E (rs_robid[i], 7, insert_rs[i], rename_robid);
-
-      `FLOP2_ES (rs_op1ready[i], 1, insert_rs[i], rename_op1ready, resolve_rsop1[i]);
-      `FLOP2_ES (rs_op2ready[i], 1, insert_rs[i], rename_op1ready, resolve_rsop2[i]);
-      
-      wire [31:0] op1_i;
-      `MUX2X1 (op1_i, 32, resolve_rsop1[i], rename_op1, wb_result);
-      `FLOP2_E (rs_op1[i], 32, insert_rs[i]|resolve_rsop1[i], op1_i);
-
-      wire [31:0] op2_i;
-      `MUX2X1 (op2_i, 32, resolve_rsop2[i], rename_op2, wb_result);
-      `FLOP2_E (rs_op2[i], 32, insert_rs[i]|resolve_rsop2[i], op2_i);
-
+    for (i = 0; i < RS_ENTRIES; i = i+1) begin : resolve_gen
+      assign resolve_rsop1[i] = resolve_valid & rs_valid[i] & (~rs_op1ready[i]) & 
+                        (rs_op1[(32*i) +: 7] == wb_robid);
+      assign resolve_rsop2[i] = resolve_valid & rs_valid[i] & (~rs_op2ready[i]) & 
+                        (rs_op2[(32*i) +: 7] == wb_robid);
     end
-  endgenerate*/
+  endgenerate
 
-  // === 
+  // Valid bit for RS entries
+  flop rs_valid_flop [RS_ENTRIES-1:0] 
+  (.clk(clk), .set(insert_rs), .rst(rst_vec), .enable(1'b0), .d(1'b0), .q(rs_valid));
 
-  always @(posedge clk) begin
-    // Issue latch
-    if (issue_valid & (~issue_stall)) begin
-      rs_valid[issue_idx] <= 1'b0;
-    end
-    // Insertion latch
-    if (rename_exers_write & (~exers_stall)) begin
-      rs_valid[insert_idx] <= 1'b1;
-      rs_op[insert_idx] <= rename_op;
-      rs_rd[insert_idx] <= rename_rd;
-      rs_robid[insert_idx] <= rename_robid;
-      rs_op1ready[insert_idx] <= rename_op1ready;
-      rs_op1[insert_idx] <= rename_op1;
-      rs_op2ready[insert_idx] <= rename_op2ready;
-      rs_op2[insert_idx] <= rename_op2;
-    end
-    // Dependency resolution: matching tags on valid writeback/uses rd
-    for (i = 0; i  < RS_ENTRIES; i = i + 1) begin
-      if (resolve_valid & rs_valid[i] & (~rs_op1ready[i]) & (rs_op1[i][6:0] == wb_robid)) begin
-        rs_op1ready[i] <= 1'b1;
-        rs_op1[i] <= wb_result;
-      end
-      if (resolve_valid & rs_valid[i] & (~rs_op2ready[i]) & (rs_op2[i][6:0] == wb_robid)) begin
-        rs_op2ready[i] <= 1'b1;
-        rs_op2[i] <= wb_result;
-      end
-    end
-    // Reset/flush logic (highest priority)
-    if (rst | rob_flush) begin
-      rs_valid <= 32'h0;
-    end
-  end
+  // Single port entries
+  flop #(5) rs_op_flop [RS_ENTRIES-1:0]
+  (.clk(clk), .set(1'b0), .rst(1'b0), .enable(insert_rs), .d(rename_op), .q(rs_op));
+  flop #(6) rs_rd_flop [RS_ENTRIES-1:0]
+  (.clk(clk), .set(1'b0), .rst(1'b0), .enable(insert_rs), .d(rename_rd), .q(rs_rd));
+  flop #(7) rs_robid_flop [RS_ENTRIES-1:0]
+  (.clk(clk), .set(1'b0), .rst(1'b0), .enable(insert_rs), .d(rename_robid), .q(rs_robid));
 
-  // ====
+  // Set when resolve, write data-in when insert
+  flop rs_op1ready_flop [RS_ENTRIES-1:0]
+  (.clk(clk), .set(resolve_rsop1), .rst(1'b0), .enable(insert_rs), 
+   .d(rename_op1ready), .q(rs_op1ready));
+
+  flop rs_op2ready_flop [RS_ENTRIES-1:0]
+  (.clk(clk), .set(resolve_rsop2), .rst(1'b0), .enable(insert_rs), 
+   .d(rename_op2ready), .q(rs_op2ready));
+
+  // Dual port entries: From writeback and insert
+  // Op1/2 inputs
+  wire [(RS_ENTRIES*32)-1:0] op1_vec;
+  wire [(RS_ENTRIES*32)-1:0] op2_vec;
+  mux #(32, 2) rs_op1_mux [RS_ENTRIES-1:0] (.sel(resolve_rsop1), .in({wb_result, rename_op1}), .out(op1_vec));
+  mux #(32, 2) rs_op2_mux [RS_ENTRIES-1:0] (.sel(resolve_rsop2), .in({wb_result, rename_op2}), .out(op2_vec));
+  
+  flop #(32) rs_op1_flop [RS_ENTRIES-1:0]
+  (.clk(clk), .set(1'b0), .rst(1'b0), .enable(insert_rs|resolve_rsop1), 
+   .d(op1_vec), .q(rs_op1));
+  flop #(32) rs_op2_flop [RS_ENTRIES-1:0]
+  (.clk(clk), .set(1'b0), .rst(1'b0), .enable(insert_rs|resolve_rsop2), 
+   .d(op2_vec), .q(rs_op2));
+
 
   // Issue logic
   wire issue_invalid;
@@ -155,7 +134,7 @@ module exers #(
   assign issue_valid = ~issue_invalid;
 
   // Functional Issue Unit Arbitration 
-  wire is_sc_op = (~&rs_op[issue_idx][4:3]);
+  wire is_sc_op = (~&exers_scalu_op[4:3]);
   wire [3:0] issue_status = {is_sc_op & ~scalu1_stall, is_sc_op & ~scalu0_stall, ~mcalu1_stall, ~mcalu0_stall}; // SCALU1: lowest priority, MCALU1: highest
   wire [3:0] issue_vec;
   privector #(4, 1) issue_alu_pripff (
@@ -173,12 +152,12 @@ module exers #(
     .out(insert_idx));
 
   // Outputs to issue
-  assign exers_robid = rs_robid[issue_idx];
-  assign exers_rd = rs_rd[issue_idx];
-  assign exers_op1 = rs_op1[issue_idx];
-  assign exers_op2 = rs_op2[issue_idx];
-  assign exers_mcalu_op = rs_op[issue_idx];
-  assign exers_scalu_op = rs_op[issue_idx];
+  assign exers_robid = rs_robid[(7*issue_idx) +: 7];
+  assign exers_rd = rs_rd[(6*issue_idx) +: 6];
+  assign exers_op1 = rs_op1[(32*issue_idx) +: 32];
+  assign exers_op2 = rs_op2[(32*issue_idx) +: 32];
+  assign exers_mcalu_op = rs_op[(5*issue_idx) +: 5];
+  assign exers_scalu_op = rs_op[(5*issue_idx) +: 5];
   assign exers_stall = rs_full;
 
 endmodule
