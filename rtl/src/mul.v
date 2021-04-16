@@ -12,17 +12,16 @@ module mul(
   output [31:0] result,
   input         stall);
 
-  localparam
-    INIT = 2'b00,
-    PROG = 2'b01,
-    PROG_FINAL = 2'b10;
-
   // Multiplier state
   wire        x0;
-  wire        inv;
   wire [3:0]  iter;
   wire [65:0] acc;
   wire [1:0]  state;
+
+  // INIT: 00, PROG: 01, PROG_FINAL: 10
+  wire INIT_STATE = ~|state;
+  wire PROG_STATE = state[0];
+  wire PROG_FINAL_STATE = state[1];
 
   // Sign extension
   wire op1_sgn = op1[31] & (op[1] ^ op[0]);
@@ -51,20 +50,15 @@ module mul(
 
   // Net partial product for iteration without negation correction
   wire [33:0] ptl_prod_i;
-  mux #(34, 2) ptl_prod_i_mux (.sel(state == PROG_FINAL),
+  mux #(34, 2) ptl_prod_i_mux (.sel(PROG_FINAL_STATE),
       .in({pp_final, pp_signed}), .out(ptl_prod_i));
     
   // Extra MSB, 2 extra bits for negation correction
-  wire [35:0] ptl_prod = {ptl_prod_i,1'b0,inv};
+  wire [35:0] ptl_prod = {ptl_prod_i,1'b0,x0};
 
 
   // State Machine
-  wire INIT_STATE = ~|state;
-  wire PROG_STATE = state[0];
-  wire PROG_FINAL_STATE = state[1];
-
   wire        x0_c;
-  wire        inv_c;
   wire [3:0]  iter_c;
   wire [65:0] acc_c;
   wire [1:0]  next_state;
@@ -73,23 +67,20 @@ module mul(
   wire [63:0] mul_result = acc_c[63:0];
 
   // Output sync for done and result: PROG_FINAL = 2'b10
-  assign done = state[1] & ~state[0];
+  assign done = PROG_FINAL_STATE;
   mux #(32, 2) result_mux (.sel(|op[1:0]), .in(mul_result), .out(result));
 
   // iter == 1
   wire iter_done = ~|iter[3:1] & iter[0];
   wire state_enable = (INIT_STATE & req) | (PROG_STATE & iter_done) | (PROG_FINAL_STATE & ~stall);
   // INIT = 2'b00 so assert rst
-  flop #(2) state_flop (.clk(clk), .rst(rst), .set(1'b0), .enable(state_enable), .d(next_state), .q(state));
+  flop #(2) state_flop (.clk(clk), .rst(rst), .set(1'b0), .enable(state_enable), .d(next_state), 
+      .q(state));
   assign next_state = {PROG_STATE, INIT_STATE};
 
   // x0 = 0 on INIT, assign during PROG
   flop x0_flop (.clk(clk), .rst(INIT_STATE), .set(1'b0), .enable(PROG_STATE), .d(x0_c), .q(x0));
   assign x0_c = acc[1] & state[0];
-
-  // inv = 0 on INIT, assign during PROG
-  flop inv_flop (.clk(clk), .rst(INIT_STATE), .set(1'b0), .enable(PROG_STATE), .d(inv_c), .q(inv));
-  assign inv_c = acc[1];
 
   // iter = 0 on INIT, assign during PROG
   flop #(4) iter_flop (.clk(clk), .rst(INIT_STATE), .set(1'b0), .enable(PROG_STATE), 
@@ -109,28 +100,5 @@ module mul(
 
   // Output sum for both PROG and FINAL
   mux #(66, 2) acc_c_mux (.sel(~INIT_STATE), .in({acc_prog, acc_init}), .out(acc_c));
-
-  /*always @(*) begin
-    next_state = state;
-    case(state)
-      INIT: begin
-        if(req)
-          next_state = PROG;
-      end
-
-      PROG: begin
-        if(iter == 1)
-          next_state = PROG_FINAL;
-      end
-
-      PROG_FINAL: begin
-        if(~stall)
-          next_state = INIT;
-      end
-
-      default:
-        next_state = INIT;
-    endcase
-  end*/
 
 endmodule
