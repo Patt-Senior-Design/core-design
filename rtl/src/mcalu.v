@@ -45,18 +45,6 @@ module mcalu(
   flop #(32) op2_flop (.clk(clk), .set(1'b0), .rst(1'b0), .enable(~mcalu_stall),
     .d(exers_op2), .q(op2));
 
-  /*always @(posedge clk)
-    if (rst | rob_flush)
-      valid <= 0;
-    else if (~mcalu_stall) begin
-      valid <= exers_mcalu_issue;
-      op <= exers_mcalu_op;
-      robid <= exers_robid;
-      rd <= exers_rd;
-      op1 <= exers_op1;
-      op2 <= exers_op2;
-    end*/
-
 
   wire        mul_done, div_done;
   wire [31:0] sc_result, mul_result, div_result;
@@ -77,14 +65,6 @@ module mcalu(
   mux #(32, 2) comp_result_flop (.sel(op[2]), .in({div_result, mul_result}), .out(comp_result));
 
   mux #(32, 2) mcalu_result_flop (.sel(is_mc_op), .in({comp_result, sc_result}), .out(mcalu_result));
-
-  /*always @(*)
-    if(~is_mc_op)
-      mcalu_result = sc_result;
-    else if(~op[2])
-      mcalu_result = mul_result;
-    else
-      mcalu_result = div_result;*/
 
   // Simple Ops  
   alu_simple sc_alu(
