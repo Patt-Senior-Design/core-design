@@ -12,7 +12,7 @@ module flop #(
     if (enable)
       q <= d;
     if (set)
-      q <= 1;
+      q <= {width{1'b1}};
     if (rst)
       q <= 0;
   end
