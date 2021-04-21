@@ -31,9 +31,6 @@ module scalu(
   reg[31:0] op1;
   reg[31:0] op2;
 
-  reg[31:0] p_vector;
-  reg[4:0] p_index;
-
   always @(posedge clk) begin
     if (rst | rob_flush) begin
       valid <= 1'b0;
