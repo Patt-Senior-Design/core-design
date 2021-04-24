@@ -45,7 +45,6 @@ module fetch(
   // buf_head advanced upon sending insns to decode
   // *_pol used to distinguish between empty and full conditions
   wire [15:0] buf_head_oh, buf_mid_oh, buf_tail_oh;
-  wire [3:0]  buf_head, buf_tail, buf_mid;
   wire        buf_head_pol, buf_tail_pol, buf_mid_pol;
 
   wire        bp_req_r;
@@ -70,15 +69,13 @@ module fetch(
 
   // derived signals
   wire buf_empty, buf_full;
-  //assign buf_empty = (buf_head_oh == buf_tail_oh) & (buf_head_pol == buf_tail_pol);
-  //assign buf_full  = (buf_head_oh == buf_tail_oh) & (buf_head_pol != buf_tail_pol);
-  assign buf_empty = (buf_head == buf_tail) & (buf_head_pol == buf_tail_pol);
-  assign buf_full  = (buf_head == buf_tail) & (buf_head_pol != buf_tail_pol);
+  assign buf_empty = (buf_head_oh == buf_tail_oh) & (buf_head_pol == buf_tail_pol);
+  assign buf_full  = (buf_head_oh == buf_tail_oh) & (buf_head_pol != buf_tail_pol);
 
-  wire [3:0] buf_mid_prev;
+  //wire [3:0] buf_mid_prev;
   wire [15:0] buf_mid_prev_oh = {buf_mid_oh[0], buf_mid_oh[15:1]};
   // debugging
-  encoder #(16) mid_prev_enc (.in(buf_mid_prev_oh), .invalid(), .out(buf_mid_prev));  
+  //encoder #(16) mid_prev_enc (.in(buf_mid_prev_oh), .invalid(), .out(buf_mid_prev));  
 
   wire icache_beat = fetch_ic_req & icache_ready;
   wire decode_beat = fetch_de_valid & ~decode_stall;
@@ -134,7 +131,7 @@ module fetch(
   assign fetch_bp_addr = buf_addr_mid[31:2];
 
   // decode interface
-  assign fetch_de_valid = ~buf_empty & buf_valid[buf_head];
+  assign fetch_de_valid = ~buf_empty & buf_valid_head;
   assign fetch_de_error = buf_error_head;
   assign fetch_de_addr = buf_addr_head;
   assign fetch_de_insn = buf_insn_head;
@@ -148,16 +145,16 @@ module fetch(
   wire [31:1] pc_flush = {rob_flush_pc, 1'b0};
 
   wire [31:0] insn_mp = buf_insn_mid_prev;
-  wire [31:1] pc_br = $signed({buf_addr_mid_prev[31:2],1'b0}) + $signed({insn_mp[31],insn_mp[7],insn_mp[30:25],insn_mp[11:8]});
-  //`ADD(31, pc_br, {buf_addr_mid_prev[31:2], 1'b0}, 
-  //  {{20{insn_mp[31]}},insn_mp[7],insn_mp[30:25],insn_mp[11:8]});
+  wire [31:1] pc_br;
+  `ADD(31, pc_br, {buf_addr_mid_prev[31:2], 1'b0}, 
+    {{20{insn_mp[31]}},insn_mp[7],insn_mp[30:25],insn_mp[11:8]});
   
-  wire [31:1] pc_jal = $signed({buf_addr_mid_prev[31:2],1'b0}) + $signed({insn_mp[31],insn_mp[19:12],insn_mp[20],insn_mp[30:21]});
-  //`ADD(31, pc_jal, {buf_addr_mid_prev[31:2], 1'b0},
-  //  {{12{insn_mp[31]}},insn_mp[19:12],insn_mp[20],insn_mp[30:21]});
+  wire [31:1] pc_jal;
+  `ADD(31, pc_jal, {buf_addr_mid_prev[31:2], 1'b0},
+    {{12{insn_mp[31]}},insn_mp[19:12],insn_mp[20],insn_mp[30:21]});
 
-  wire [31:1] pc_inc = pc + 2;
-  //`ADD(31, pc_inc, pc, 31'h02);
+  wire [31:1] pc_inc; //= pc + 2;
+  `ADD(31, pc_inc, pc, 31'h02);
   
   wire [3:0] pc_sel;
   wire pc_dis;
@@ -184,9 +181,6 @@ module fetch(
   flop buf_tail_pol_flop (.clk(clk), .rst(rst|rob_flush), .set(1'b0), 
       .enable(setpc | icache_beat), .d(buf_tail_pol_next), .q(buf_tail_pol));
 
-  // debugging
-  encoder #(16) tail_enc (.in(buf_tail_oh), .invalid(), .out(buf_tail));  
-
 
   // buf_mid
   onehot #(16) buf_mid_ohmod (.clk(clk), .rst(rst|rob_flush),
@@ -195,9 +189,6 @@ module fetch(
   flop buf_mid_pol_flop (.clk(clk), .rst(rst|rob_flush), .set(1'b0),
       .enable(icache_valid & ~setpc), .d(buf_mid_pol ^ buf_mid_oh[15]), .q(buf_mid_pol));
 
-  // debugging
-  encoder #(16) mid_enc (.in(buf_mid_oh), .invalid(), .out(buf_mid));
-
 
   // buf_head
   onehot #(16) buf_head_ohmod (.clk(clk), .rst(rst|rob_flush),
@@ -205,9 +196,6 @@ module fetch(
 
   flop buf_head_pol_flop (.clk(clk), .rst(rst|rob_flush), .set(1'b0),
       .enable(decode_beat), .d(buf_head_pol ^ buf_head_oh[15]), .q(buf_head_pol));
-
-  // debugging
-  encoder #(16) head_enc (.in(buf_head_oh), .invalid(), .out(buf_head));
 
   
   // buf write ports
@@ -246,28 +234,6 @@ module fetch(
   flop #(16) buf_bptag_flop [15:0] (.clk(clk), .rst(1'b0), .set(1'b0),
     .enable(buf_bp_en), .d(brpred_bptag), .q(buf_bptag));
 
-  // buf
-  /*always @(posedge clk)
-    if(rst)
-      buf_valid <= 0;
-    else begin
-      if(gen_misalign_err) begin
-        buf_valid[buf_tail] <= 1;
-      end
-
-      if(icache_beat) begin
-        buf_valid[buf_tail] <= 0;
-      end
-
-      if(icache_valid) begin
-        if(~fetch_bp_req)
-          buf_valid[buf_mid] <= 1;
-      end
-
-      if(bp_req_r) begin
-        buf_valid[buf_mid_prev] <= 1;
-      end
-    end*/
 
   wire rst_tmp = rst | setpc;
   // bp_req_r
