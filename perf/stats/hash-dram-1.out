@@ -1,0 +1,102 @@
+make: Entering directory '/home/ecelrc/students/aramesh/464k/core-design/tests'
+make: Nothing to be done for 'all'.
+make: Leaving directory '/home/ecelrc/students/aramesh/464k/core-design/tests'
+make: Entering directory '/home/ecelrc/students/aramesh/464k/core-design/behavioral'
+make: Nothing to be done for 'all'.
+make: Leaving directory '/home/ecelrc/students/aramesh/464k/core-design/behavioral'
+Chronologic VCS simulator copyright 1991-2018
+Contains Synopsys proprietary information.
+Compiler version O-2018.09-SP1_Full64; Runtime version O-2018.09-SP1_Full64;  Apr  1 23:46 2021
+WARNING: Output directory output not exists! Using current directory for output!
+Table Size: 1024
+
+Warning-[TFX-DUMPSIZ] Dumplimit Size Exceeded
+  Warning: Dumplimit byte size (33554432) exceeded, dumping stopped.
+  If more VCD file data is needed, please increase the limit or remove the 
+  $dumplimit system task.
+
+LF: 50 (Size: 512) --> { Found: 5000 / 10000,  Avg Exec Time: 447, Min: 374, Max: 1565 }
+LF: 60 (Size: 614) --> { Found: 5000 / 10000,  Avg Exec Time: 482, Min: 374, Max: 1750 }
+LF: 70 (Size: 716) --> { Found: 5000 / 10000,  Avg Exec Time: 559, Min: 374, Max: 2772 }
+LF: 80 (Size: 819) --> { Found: 5000 / 10000,  Avg Exec Time: 652, Min: 374, Max: 3631 }
+LF: 90 (Size: 921) --> { Found: 5000 / 10000,  Avg Exec Time: 1007, Min: 374, Max: 4612 }
+LF: 95 (Size: 972) --> { Found: 5000 / 10000,  Avg Exec Time: 1558, Min: 374, Max: 7369 }
+
+Table Size: 2048
+LF: 50 (Size: 1024) --> { Found: 5000 / 10000,  Avg Exec Time: 439, Min: 374, Max: 1259 }
+LF: 60 (Size: 1228) --> { Found: 5000 / 10000,  Avg Exec Time: 469, Min: 374, Max: 1390 }
+LF: 70 (Size: 1433) --> { Found: 5000 / 10000,  Avg Exec Time: 523, Min: 374, Max: 2542 }
+LF: 80 (Size: 1638) --> { Found: 5000 / 10000,  Avg Exec Time: 652, Min: 374, Max: 3900 }
+LF: 90 (Size: 1843) --> { Found: 5000 / 10000,  Avg Exec Time: 2414, Min: 374, Max: 23387 }
+LF: 95 (Size: 1945) --> { Found: 5000 / 10000,  Avg Exec Time: 6228, Min: 374, Max: 41425 }
+
+Table Size: 4096
+LF: 50 (Size: 2047) --> { Found: 5000 / 10000,  Avg Exec Time: 444, Min: 374, Max: 1205 }
+LF: 60 (Size: 2457) --> { Found: 5000 / 10000,  Avg Exec Time: 476, Min: 373, Max: 1662 }
+LF: 70 (Size: 2867) --> { Found: 5000 / 10000,  Avg Exec Time: 531, Min: 374, Max: 2802 }
+LF: 80 (Size: 3276) --> { Found: 5000 / 10000,  Avg Exec Time: 725, Min: 374, Max: 6760 }
+LF: 90 (Size: 3686) --> { Found: 5000 / 10000,  Avg Exec Time: 1407, Min: 374, Max: 11328 }
+LF: 95 (Size: 3891) --> { Found: 5000 / 10000,  Avg Exec Time: 2649, Min: 374, Max: 21210 }
+
+Table Size: 8192
+LF: 50 (Size: 4096) --> { Found: 5000 / 10000,  Avg Exec Time: 448, Min: 373, Max: 1716 }
+LF: 60 (Size: 4915) --> { Found: 5000 / 10000,  Avg Exec Time: 479, Min: 373, Max: 2176 }
+LF: 70 (Size: 5734) --> { Found: 5000 / 10000,  Avg Exec Time: 533, Min: 373, Max: 2620 }
+LF: 80 (Size: 6553) --> { Found: 5000 / 10000,  Avg Exec Time: 688, Min: 374, Max: 5574 }
+LF: 90 (Size: 7372) --> { Found: 5000 / 10000,  Avg Exec Time: 1411, Min: 374, Max: 21573 }
+LF: 95 (Size: 7782) --> { Found: 5000 / 10000,  Avg Exec Time: 3421, Min: 385, Max: 39798 }
+
+Table Size: 16384
+LF: 50 (Size: 8192) --> { Found: 5000 / 10000,  Avg Exec Time: 447, Min: 373, Max: 1683 }
+LF: 60 (Size: 9830) --> { Found: 5000 / 10000,  Avg Exec Time: 483, Min: 373, Max: 2153 }
+LF: 70 (Size: 11468) --> { Found: 5000 / 10000,  Avg Exec Time: 548, Min: 373, Max: 4411 }
+LF: 80 (Size: 13107) --> { Found: 5000 / 10000,  Avg Exec Time: 819, Min: 373, Max: 16919 }
+LF: 90 (Size: 14745) --> { Found: 5000 / 10000,  Avg Exec Time: 1666, Min: 353, Max: 31619 }
+LF: 95 (Size: 15564) --> { Found: 5000 / 10000,  Avg Exec Time: 4486, Min: 374, Max: 54168 }
+
+Table Size: 32768
+LF: 50 (Size: 16384) --> { Found: 5000 / 10000,  Avg Exec Time: 467, Min: 373, Max: 1527 }
+LF: 60 (Size: 19660) --> { Found: 5000 / 10000,  Avg Exec Time: 496, Min: 324, Max: 2424 }
+LF: 70 (Size: 22935) --> { Found: 5000 / 10000,  Avg Exec Time: 556, Min: 342, Max: 3048 }
+LF: 80 (Size: 26214) --> { Found: 5000 / 10000,  Avg Exec Time: 697, Min: 373, Max: 6903 }
+LF: 90 (Size: 29490) --> { Found: 5000 / 10000,  Avg Exec Time: 1429, Min: 323, Max: 22117 }
+LF: 95 (Size: 31129) --> { Found: 5000 / 10000,  Avg Exec Time: 4432, Min: 385, Max: 85548 }
+
+Table Size: 65536
+LF: 50 (Size: 32765) --> { Found: 5000 / 10000,  Avg Exec Time: 498, Min: 376, Max: 1950 }
+LF: 60 (Size: 39319) --> { Found: 5000 / 10000,  Avg Exec Time: 529, Min: 376, Max: 2733 }
+LF: 70 (Size: 45874) --> { Found: 5000 / 10000,  Avg Exec Time: 595, Min: 347, Max: 5101 }
+LF: 80 (Size: 52426) --> { Found: 5000 / 10000,  Avg Exec Time: 744, Min: 368, Max: 8400 }
+LF: 90 (Size: 58981) --> { Found: 5000 / 10000,  Avg Exec Time: 1587, Min: 376, Max: 27580 }
+LF: 95 (Size: 62259) --> { Found: 5000 / 10000,  Avg Exec Time: 5653, Min: 347, Max: 128768 }
+
+Table Size: 131072
+LF: 50 (Size: 65521) --> { Found: 5000 / 10000,  Avg Exec Time: 523, Min: 347, Max: 1873 }
+LF: 60 (Size: 78635) --> { Found: 5000 / 10000,  Avg Exec Time: 554, Min: 344, Max: 2402 }
+LF: 70 (Size: 91742) --> { Found: 5000 / 10000,  Avg Exec Time: 611, Min: 315, Max: 4446 }
+LF: 80 (Size: 104847) --> { Found: 5000 / 10000,  Avg Exec Time: 771, Min: 319, Max: 11535 }
+LF: 90 (Size: 117953) --> { Found: 5000 / 10000,  Avg Exec Time: 1478, Min: 388, Max: 25597 }
+LF: 95 (Size: 124511) --> { Found: 5000 / 10000,  Avg Exec Time: 4273, Min: 356, Max: 97511 }
+
+Table Size: 262144
+LF: 50 (Size: 130989) --> { Found: 5000 / 10000,  Avg Exec Time: 542, Min: 324, Max: 1882 }
+LF: 60 (Size: 157255) --> { Found: 5000 / 10000,  Avg Exec Time: 569, Min: 376, Max: 2375 }
+LF: 70 (Size: 183453) --> { Found: 5000 / 10000,  Avg Exec Time: 630, Min: 335, Max: 3174 }
+LF: 80 (Size: 209660) --> { Found: 5000 / 10000,  Avg Exec Time: 767, Min: 376, Max: 9281 }
+LF: 90 (Size: 235883) --> { Found: 5000 / 10000,  Avg Exec Time: 1554, Min: 384, Max: 48603 }
+*** SUMMARY STATISTICS ***
+Cycles elapsed: 1285123773
+Instructions retired: 348208597
+Average CPI: 3.691
+Branch prediction accuracy: 0.97
+ROB occupancy histogram: 22267870,7650683,13238670,36679541,14050961,21447652,28953683,9468796,12419381,33285784,10688361,22498647,7804173,47123016,9017722,12194844,38777055,10847344,7757449,6141970,36573445,5758767,24865605,5319542,6792423,11710320,7615771,8362537,7529592,24328617,5938563,7499330,14194129,18295641,42479432,9167419,11476388,18347975,218739635,41302137,168299750,76185756,63568385,33137646,21974762,1551643,1293706,1656339,512745,3500999,541239,464017,1021465,793782,514614,712064,873992,297494,496270,694538,440239,353229,294141,160397,150506,172944,150437,136609,84356,109127,96544,75775,53608,55768,41187,38287,29518,21953,57597,1060988,1061320,1058613,2106580,538090,13582,8539,12797,3050,2881,1480,1229,1441,2034,1140,2837,896,946,858,1260,711,1284,393,567,5193,441,1462,881,298,1202,602,354,338,274,323,148,267,993,100,79,104,352,79,108,85,100,65,88,1020,993, 
+LQ occupancy histogram: 463563391,107454483,39565111,184168659,455895060,8433926,6946916,2706321,836903,4195500,3476137,1708803,341606,31380,3425,525064,5271078, 
+SQ occupancy histogram: 1104002874,61614024,40136730,36680275,4257649,21126459,11447099,8857,4322,5078,17937,5284,2632,2127,2518,524888,5285010, 
+$finish called from file "top.v", line 322.
+$finish at simulation time        1285123772500
+           V C S   S i m u l a t i o n   R e p o r t 
+Time: 1285123772500 ps
+CPU Time:  17823.030 seconds;       Data structure size:  32.2Mb
+Fri Apr  2 04:44:08 2021
+LF: 95 (Size: 249000) --> { Found: 5000 / 10000,  Avg Exec Time: 4289, Min: 388, Max: 131261 }
+
