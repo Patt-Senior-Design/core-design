@@ -110,9 +110,21 @@ HashSet* create_hashset(uint32_t cap) {
   return set;
 }
 
-uint64_t hash_fn (int32_t val) {
+#define HASH 2
+// Hash 1
+#if HASH == 1
+uint64_t __attribute__((optimize("O1"))) hash_fn (int32_t val) {
   return (val * 2654435761);
 }
+#endif
+#if HASH == 2
+// Hash 2
+uint64_t __attribute__((optimize("O1"))) hash_fn (int32_t val) {
+  val = ((val >> 16) ^ val) * 0x7feb352d;
+  val = ((val >> 15) ^ val) * 0x846ca68b;
+  return (val >> 16) ^ val;
+}
+#endif
 
 bool findNode (HashSet* set, int32_t val) {
   uint64_t hash = hash_fn(val);

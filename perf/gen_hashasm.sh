@@ -11,7 +11,7 @@ make -C $DIR/exec clean > /dev/null || exit $?
 #for n in $(seq $SEED_CT); do
 riscv64-unknown-elf-gcc -march=rv32im -mabi=ilp32 -Wall -O2 -ffunction-sections \
                                      -fdata-sections  -S -o $DIR/exec/hashset.s $DIR/hashset.c
-$DIR/replace_func.py $DIR/exec/fasthash.s $DIR/exec/hashset.s $DIR/findfast.S
+$DIR/replace_func.py $DIR/exec/fasthash.s $DIR/exec/hashset.s $DIR/findfast_new.S
 #done
 
 make -C $DIR/exec > /dev/null || exit $? 

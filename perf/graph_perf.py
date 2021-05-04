@@ -32,10 +32,10 @@ def get_test_stats (filename):
 
   return test_stats, table_sizes
 
-def graph_stats():
+def graph_stats(filename, it):
   plt.figure(figsize=(8.8, 6.6))
-  normal_stats, normal_tables = get_test_stats('stats/hash-dram-1.out')
-  ext_stats, ext_tables = get_test_stats('stats/fasthash-dram-1.out')
+  normal_stats, normal_tables = get_test_stats('stats/{}-{}.out'.format(filename, it))
+  ext_stats, ext_tables = get_test_stats('stats/fast{}-{}.out'.format(filename, it))
   if not normal_stats or not ext_stats:
     return False
 
@@ -62,12 +62,13 @@ def graph_stats():
   first_leg = plt.legend(loc=1, ncol=1, prop={'size': 10}, handles=[*patches])
   ax = plt.gca().add_artist(first_leg)
   plt.legend(loc=2, ncol=1,prop={'size': 11}, handles=[n_line, e_line])
-  plt.savefig("hashset_perf.png", dpi=100)
+  plt.savefig("hashset_perf_{}.png".format(it), dpi=100)
   return True
 
 if __name__ == '__main__':
-  if (graph_stats()):
-    print ("Success")
-  else:
-    print ("Failure")
+  for i in range(2):
+    if (graph_stats("hash-dram", i+1)):
+      print ("Success")
+    else:
+      print ("Failure")
 
