@@ -117,5 +117,6 @@ _start:
 	.size _start, .-_start
 
 	.section .bss
+	.align 4
 _saved_regs:
 	.word	0, 0, 0

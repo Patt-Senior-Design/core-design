@@ -1,3 +1,5 @@
+`include "buscmd.vh"
+
 // main bus
 module bus(
   input             clk,

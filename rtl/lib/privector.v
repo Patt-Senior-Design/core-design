@@ -1,4 +1,6 @@
 // Priority Encoder (Sklansky design): MSB of out is 1 if input is 0
+/* verilator lint_off WIDTH */
+/* verilator lint_off UNOPTFLAT */
 module privector #(
   parameter BITS = 32,
   parameter SEARCH_BIT = 1
@@ -47,3 +49,5 @@ module privector #(
   assign invalid = ~|partial_out[0];
 
 endmodule
+/* verilator lint_on UNOPTFLAT */
+/* verilator lint_on WIDTH */

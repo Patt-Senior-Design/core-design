@@ -1,4 +1,6 @@
 // SHF
+/* verilator lint_off WIDTH */
+/* verilator lint_off UNOPTFLAT */
 module shf #(
   parameter W = 32,
   parameter RIGHT = 1
@@ -37,3 +39,5 @@ module shf #(
   assign c = shf_acc[B][W+:W]; 
 
 endmodule
+/* verilator lint_on UNOPTFLAT */
+/* verilator lint_on WIDTH */

@@ -1,4 +1,6 @@
 // CMP_LS
+/* verilator lint_off WIDTH */
+/* verilator lint_off UNOPTFLAT */
 module cmp_ls #(
   parameter W = 32
   )(
@@ -26,3 +28,5 @@ module cmp_ls #(
   assign out = {31'b0, cmp_res[0] ^ (sgn & opp_sgn & ~(a == b))};
 
 endmodule
+/* verilator lint_on UNOPTFLAT */
+/* verilator lint_on WIDTH */
