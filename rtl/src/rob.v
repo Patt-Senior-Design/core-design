@@ -58,34 +58,34 @@ module rob (
     output [31:0] rob_csr_tval
 );
 
-  reg [     127:0] buf_executed;
-  reg [     127:0] buf_error;
-  reg [ 128*7-1:0] buf_retop;
-  reg [128*30-1:0] buf_addr;
-  reg [ 128*6-1:0] buf_rd;
-  reg [ 128*5-1:0] buf_ecause;
-  reg [128*32-1:0] buf_result;
-  reg [128*30-1:0] buf_target;
-  reg [128*16-1:0] buf_bptag;
-  reg [     127:0] buf_bptaken;
-  reg [     127:0] buf_forwarded;
+  wire [     127:0] buf_executed;
+  wire [     127:0] buf_error;
+  wire [ 128*7-1:0] buf_retop;
+  wire [128*30-1:0] buf_addr;
+  wire [ 128*6-1:0] buf_rd;
+  wire [ 128*5-1:0] buf_ecause;
+  wire [128*32-1:0] buf_result;
+  wire [128*30-1:0] buf_target;
+  wire [128*16-1:0] buf_bptag;
+  wire [     127:0] buf_bptaken;
+  wire [     127:0] buf_forwarded;
 
   // insert at tail, remove at head
-  reg [6:0] buf_head, buf_tail;
-  reg buf_head_pol, buf_tail_pol;
+  wire [6:0] buf_head, buf_tail;
+  wire buf_head_pol, buf_tail_pol;
   wire [7:0] buf_head_next, buf_tail_next;
 
-  reg         ret_valid;
-  reg         ret_error;
-  reg  [ 6:0] ret_retop;
-  reg  [31:2] ret_addr;
-  reg  [ 5:0] ret_rd;
-  reg  [ 4:0] ret_ecause;
-  reg  [31:0] ret_result;
-  reg  [31:2] ret_target;
-  reg  [15:0] ret_bptag;
-  reg         ret_bptaken;
-  reg         ret_forwarded;
+  wire         ret_valid;
+  wire         ret_error;
+  wire  [ 6:0] ret_retop;
+  wire  [31:2] ret_addr;
+  wire  [ 5:0] ret_rd;
+  wire  [ 4:0] ret_ecause;
+  wire  [31:0] ret_result;
+  wire  [31:2] ret_target;
+  wire  [15:0] ret_bptag;
+  wire         ret_bptaken;
+  wire         ret_forwarded;
 
   wire [ 6:0] ret_rd_addr;
   wire        ret_rd_addr_pol;
